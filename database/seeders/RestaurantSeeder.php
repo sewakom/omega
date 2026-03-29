@@ -19,10 +19,10 @@ class RestaurantSeeder extends Seeder
 {
     public function run(): void
     {
-        // Désactiver les clés étrangères pour permettre de vider les tables sans erreurs
+        // Désactiver les clés étrangères pour permettre de vider les tables
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
-        // Liste des tables à vider
+        // Liste des tables à vider pour repartir à zéro proprement
         $tables = [
             'restaurants', 'roles', 'users', 'floors', 'tables', 
             'categories', 'products', 'ingredients', 'recipes',
@@ -37,7 +37,9 @@ class RestaurantSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // 1. Création du Restaurant principal
+        // On FORCE l'id à 1 pour être sûr que le VITE_RESTAURANT_ID=1 du frontend fonctionne
         $restaurant = Restaurant::create([
+            'id'       => 1, // FORCE L'ID A 1
             'name'     => 'SmartFlow POS',
             'slug'     => 'smartflow-pos-demo',
             'address'  => 'Avenue du 24 Janvier, Lomé, Togo',
@@ -67,7 +69,13 @@ class RestaurantSeeder extends Seeder
 
         $createdRoles = [];
         foreach ($roles as $role) {
-            $createdRoles[$role['name']] = Role::create(['restaurant_id' => $restaurant->id, ...$role]);
+            $createdRoles[$role['name']] = Role::create([
+                'restaurant_id' => $restaurant->id, 
+                'name' => $role['name'],
+                'display_name' => $role['display_name'],
+                'permissions' => $role['permissions'],
+                'is_system' => $role['is_system']
+            ]);
         }
 
         // 3. Création des Utilisateurs
@@ -109,7 +117,7 @@ class RestaurantSeeder extends Seeder
             ]);
         }
 
-        // 5. Ingrédients (Stock) - À créer AVANT les recettes
+        // 5. Ingrédients (Stock)
         $ingredientsData = [
             ['name' => 'Pain Burger', 'unit' => 'unité', 'quantity' => 50, 'min_quantity' => 10, 'cost' => 150],
             ['name' => 'Steak de Bœuf', 'unit' => 'unité', 'quantity' => 40, 'min_quantity' => 15, 'cost' => 800],
@@ -134,7 +142,7 @@ class RestaurantSeeder extends Seeder
             ]);
         }
 
-        // 6. Catégories et Produits (avec Recettes et Stock direct)
+        // 6. Catégories et Produits
         $categoriesData = [
             'Burgers' => [
                 ['name' => 'Cheeseburger King', 'price' => 3500, 'ingredients' => [
@@ -179,7 +187,7 @@ class RestaurantSeeder extends Seeder
                     'min_quantity'  => isset($pData['direct_stock']) ? 6 : 0,
                 ]);
 
-                // Création de la recette si nécessaire
+                // Création de la recette
                 if (isset($pData['ingredients'])) {
                     foreach ($pData['ingredients'] as $recipeItem) {
                         Recipe::create([
@@ -192,12 +200,7 @@ class RestaurantSeeder extends Seeder
             }
         }
 
-        $this->command->info("✅ SYSTÈME COMPLET INITIALISÉ (SmartFlow POS)");
-        $this->command->info("--------------------------------------------------");
-        $this->command->info("🏢 Restaurant  : SmartFlow POS");
-        $this->command->info("🔑 Admin ID    : admin@smartflow.tg / password (PIN: 0000)");
-        $this->command->info("📦 Stock       : " . count($ingredientsData) . " ingrédients créés.");
-        $this->command->info("🍕 Menu        : " . Product::count() . " produits configurés.");
-        $this->command->info("👨‍🍳 Recettes   : " . Recipe::count() . " liens produits/ingrédients créés.");
+        $this->command->info("✅ SYSTÈME COMPLET INITIALISÉ FORCÉ AVEC ID 1 !");
+        $this->command->info("🔑 Mdp: password | PIN Admin: 0000");
     }
 }
