@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Payment;
+use App\Models\OrderItem;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class ReportController extends Controller
+{
+    public function sales(Request $request)
+    {
+        $request->validate(['from' => 'required|date', 'to' => 'required|date|after_or_equal:from']);
+        $restaurantId = $request->user()->restaurant_id;
+
+        $summary = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')
+            ->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59'])
+            ->selectRaw('COUNT(*) as orders_count, SUM(total) as revenue, AVG(total) as avg_ticket, SUM(covers) as total_covers, SUM(discount_amount) as total_discounts, SUM(vat_amount) as total_vat')->first();
+
+        $byDay = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')
+            ->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59'])
+            ->selectRaw('DATE(paid_at) as date, COUNT(*) as orders, SUM(total) as revenue')
+            ->groupBy('date')->orderBy('date')->get();
+
+        $byMethod = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59']))
+            ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
+
+        return response()->json(['summary' => $summary, 'by_day' => $byDay, 'by_method' => $byMethod]);
+    }
+
+    public function topProducts(Request $request)
+    {
+        $request->validate(['from' => 'required|date', 'to' => 'required|date', 'limit' => 'integer|min:5|max:50']);
+
+        $products = OrderItem::with('product:id,name,image')
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $request->user()->restaurant_id)->where('status', 'paid')->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59']))
+            ->whereNotIn('status', ['cancelled'])
+            ->selectRaw('product_id, SUM(quantity) as total_qty, SUM(subtotal) as revenue')
+            ->groupBy('product_id')->orderByDesc('total_qty')->limit($request->limit ?? 10)->get();
+
+        return response()->json($products);
+    }
+
+    public function byWaiter(Request $request)
+    {
+        $request->validate(['from' => 'required|date', 'to' => 'required|date']);
+        $data = Order::with('waiter:id,first_name,last_name')->where('restaurant_id', $request->user()->restaurant_id)->where('status', 'paid')
+            ->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59'])
+            ->selectRaw('user_id, COUNT(*) as orders_count, SUM(total) as revenue, AVG(total) as avg_ticket')
+            ->groupBy('user_id')->orderByDesc('revenue')->get();
+        return response()->json($data);
+    }
+
+    public function byCategory(Request $request)
+    {
+        $request->validate(['from' => 'required|date', 'to' => 'required|date']);
+        $data = OrderItem::with('product.category:id,name')
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $request->user()->restaurant_id)->where('status', 'paid')->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59']))
+            ->whereNotIn('status', ['cancelled'])
+            ->selectRaw('products.category_id, SUM(order_items.quantity) as qty, SUM(order_items.subtotal) as revenue')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->groupBy('products.category_id')->orderByDesc('revenue')->get();
+        return response()->json($data);
+    }
+
+    public function cashSummary(Request $request)
+    {
+        $request->validate(['date' => 'nullable|date']);
+        $date = $request->date ?? today()->toDateString();
+        $restaurantId = $request->user()->restaurant_id;
+
+        $sessions = \App\Models\CashSession::with('user:id,first_name,last_name')->where('restaurant_id', $restaurantId)->whereDate('opened_at', $date)->get();
+        $payments = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('paid_at', $date))
+            ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
+
+        return response()->json(['date' => $date, 'sessions' => $sessions, 'payments' => $payments, 'total' => $payments->sum('total')]);
+    }
+
+    public function dashboard(Request $request)
+    {
+        $restaurantId = $request->user()->restaurant_id;
+        $today = today()->toDateString();
+
+        $revenueToday = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today)->sum('total');
+        $ordersToday = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today)->count();
+        $coversToday = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today)->sum('covers');
+        $avgTicket = $ordersToday > 0 ? $revenueToday / $ordersToday : 0;
+
+        $tablesStats = \App\Models\Table::whereHas('floor', fn($q) => $q->where('restaurant_id', $restaurantId))
+            ->selectRaw("status, COUNT(*) as count")->groupBy('status')->get()->keyBy('status');
+
+        $yesterday = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', today()->subDay())->sum('total');
+        $growth = $yesterday > 0 ? (($revenueToday - $yesterday) / $yesterday) * 100 : 0;
+
+        $pendingRevenue = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->sum('total');
+        $activeOrders = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->count();
+
+        return response()->json([
+            'revenue_today' => round($revenueToday, 2), 
+            'pending_revenue' => round($pendingRevenue, 2),
+            'orders_today' => $ordersToday,
+            'active_orders' => $activeOrders,
+            'covers_today' => $coversToday, 
+            'avg_ticket' => round($avgTicket, 2),
+            'growth_percent' => round($growth, 1), 
+            'tables' => $tablesStats,
+        ]);
+    }
+}

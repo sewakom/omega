@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Order;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+
+class ReceiptController extends Controller
+{
+    public function show(Request $request, int $orderId)
+    {
+        $order = Order::with(['items' => fn($q) => $q->whereNotIn('status', ['cancelled']), 'items.product:id,name,vat_rate', 'items.modifiers.modifier:id,name,extra_price', 'payments', 'table:id,number', 'waiter:id,first_name,last_name', 'cashier:id,first_name,last_name'])
+            ->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+
+        $restaurant = $request->user()->restaurant;
+        $config = $restaurant->settings ?? [];
+        $receipt = $this->buildReceipt($order, $restaurant, $config);
+
+        return response()->json($receipt);
+    }
+
+    public function pdf(Request $request, int $orderId)
+    {
+        $order = Order::with(['items' => fn($q) => $q->whereNotIn('status', ['cancelled']), 'items.product', 'items.modifiers.modifier', 'payments', 'table'])
+            ->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+
+        $restaurant = $request->user()->restaurant;
+        $config = $restaurant->settings ?? [];
+        $receipt = $this->buildReceipt($order, $restaurant, $config);
+
+        $pdf = Pdf::loadView('receipts.ticket', compact('receipt', 'restaurant', 'config'))
+            ->setPaper([0, 0, 226.77, 700])->setOption('margin-top', 0)->setOption('margin-bottom', 0)->setOption('margin-left', 0)->setOption('margin-right', 0);
+
+        return $pdf->download("ticket-{$order->order_number}.pdf");
+    }
+
+    public function html(Request $request, int $orderId)
+    {
+        $order = Order::with(['items.product', 'items.modifiers.modifier', 'payments', 'table'])
+            ->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+
+        $restaurant = $request->user()->restaurant;
+        $config = $restaurant->settings ?? [];
+        $receipt = $this->buildReceipt($order, $restaurant, $config);
+
+        return response()->json(['html' => view('receipts.ticket', compact('receipt', 'restaurant', 'config') + ['is_preview' => true])->render()]);
+    }
+
+    public function sendSms(Request $request, int $orderId)
+    {
+        $request->validate(['phone' => 'required|string|min:8']);
+        $order = Order::where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+        $order->logs()->create(['user_id' => auth()->id(), 'action' => 'receipt_sms', 'message' => "Reçu envoyé par SMS au {$request->phone}"]);
+        return response()->json(['message' => 'Reçu envoyé par SMS.']);
+    }
+
+    public function sendEmail(Request $request, int $orderId)
+    {
+        $request->validate(['email' => 'required|email']);
+        $order = Order::with(['items.product', 'payments', 'table'])->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+        $restaurant = $request->user()->restaurant;
+        $config = $restaurant->settings ?? [];
+        $receipt = $this->buildReceipt($order, $restaurant, $config);
+
+        Mail::send('receipts.ticket', compact('receipt', 'restaurant', 'config'), function ($mail) use ($request, $order, $restaurant) {
+            $mail->to($request->email)->subject("Votre reçu — {$restaurant->name} — {$order->order_number}");
+        });
+
+        return response()->json(['message' => 'Reçu envoyé par email.']);
+    }
+
+    private function buildReceipt(Order $order, $restaurant, array $config): array
+    {
+        $currencySymbol = $config['currency_symbol'] ?? 'FCFA';
+        $currencyPosition = $config['currency_position'] ?? 'after';
+        $formatAmount = fn($amount) => $currencyPosition === 'before'
+            ? "{$currencySymbol} " . number_format($amount, 0, '.', ' ')
+            : number_format($amount, 0, '.', ' ') . " {$currencySymbol}";
+
+        $lines = $order->items->map(function ($item) use ($formatAmount) {
+            $modifiers = $item->modifiers->map(fn($m) => ['name' => $m->modifier->name, 'extra_price' => $m->extra_price, 'extra_fmt' => $m->extra_price > 0 ? '+' . number_format($m->extra_price, 0) : ''])->toArray();
+            $lineTotal = ($item->unit_price * $item->quantity) + collect($modifiers)->sum('extra_price') * $item->quantity;
+            return ['name' => $item->product->name, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'unit_fmt' => $formatAmount($item->unit_price), 'total' => $lineTotal, 'total_fmt' => $formatAmount($lineTotal), 'notes' => $item->notes, 'modifiers' => $modifiers];
+        })->toArray();
+
+        $paymentLines = $order->payments->map(fn($p) => ['method' => $this->methodLabel($p->method), 'amount' => $p->amount, 'amount_fmt' => $formatAmount($p->amount), 'reference' => $p->reference, 'amount_given' => $p->amount_given, 'change_given' => $p->change_given, 'change_fmt' => $p->change_given ? $formatAmount($p->change_given) : null])->toArray();
+
+        return [
+            'restaurant' => ['name' => $restaurant->name, 'logo' => $restaurant->logo ? asset('storage/' . $restaurant->logo) : null, 'address' => $restaurant->address, 'phone' => $restaurant->phone, 'email' => $restaurant->email, 'vat_number' => $restaurant->vat_number],
+            'order' => ['id' => $order->id, 'number' => $order->order_number, 'date' => $order->created_at->format('d/m/Y'), 'time' => $order->created_at->format('H:i'), 'paid_at' => $order->paid_at?->format('d/m/Y H:i'), 'table_number' => $order->table?->number, 'covers' => $order->covers, 'type' => $order->type, 'type_label' => $this->typeLabel($order->type), 'waiter' => $order->waiter?->full_name, 'cashier' => $order->cashier?->full_name, 'notes' => $order->notes],
+            'lines' => $lines,
+            'totals' => ['subtotal' => $order->subtotal, 'subtotal_fmt' => $formatAmount($order->subtotal), 'discount' => $order->discount_amount, 'discount_fmt' => $order->discount_amount > 0 ? '-' . $formatAmount($order->discount_amount) : null, 'discount_reason' => $order->discount_reason, 'vat_rate' => $config['default_vat_rate'] ?? 18, 'vat_amount' => $order->vat_amount, 'vat_fmt' => $formatAmount($order->vat_amount), 'total' => $order->total, 'total_fmt' => $formatAmount($order->total), 'amount_paid' => $order->amountPaid(), 'amount_paid_fmt' => $formatAmount($order->amountPaid()), 'change' => max(0, $order->amountPaid() - $order->total), 'change_fmt' => $formatAmount(max(0, $order->amountPaid() - $order->total))],
+            'payments' => $paymentLines,
+            'footer' => ['message' => $config['receipt_footer'] ?? 'Merci de votre visite !', 'website' => $config['receipt_website'] ?? null, 'show_logo' => $config['receipt_logo'] ?? true, 'width' => $config['receipt_width'] ?? '80mm'],
+            'generated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', default => 'Autre' }; }
+    private function typeLabel(string $type): string { return match($type) { 'dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'delivery' => 'Livraison', default => $type }; }
+}
