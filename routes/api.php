@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Salles
     Route::apiResource('floors', Api\FloorController::class);
+    Route::get('floors/{floor}/tables',            [Api\FloorController::class, 'getTables']);
     Route::post('floors/{floor}/tables',           [Api\FloorController::class, 'addTable']);
     Route::delete('floors/{floor}/tables/{table}', [Api\FloorController::class, 'removeTable']);
 

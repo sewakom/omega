@@ -52,6 +52,16 @@ class FloorController extends Controller
         return response()->json(['message' => 'Salle désactivée.']);
     }
 
+    public function getTables(Request $request, Floor $floor)
+    {
+        abort_if($floor->restaurant_id !== $request->user()->restaurant_id, 403);
+        $tables = $floor->tables()
+            ->where('active', true)
+            ->with(['currentOrder:id,table_id,status,created_at'])
+            ->get();
+        return response()->json($tables);
+    }
+
     public function addTable(Request $request, Floor $floor)
     {
         abort_if($floor->restaurant_id !== $request->user()->restaurant_id, 403);
