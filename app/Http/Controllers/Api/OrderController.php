@@ -66,11 +66,13 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'table_id'   => 'nullable|exists:tables,id',
-            'type'       => 'required|in:dine_in,takeaway,delivery',
-            'covers'     => 'integer|min:1',
-            'notes'      => 'nullable|string',
-            'items'      => 'required|array|min:1',
+            'table_id'       => 'nullable|exists:tables,id',
+            'type'           => 'required|in:dine_in,takeaway,delivery,gozem',
+            'covers'         => 'integer|min:1',
+            'notes'          => 'nullable|string',
+            'customer_name'  => 'nullable|string|max:150',
+            'customer_phone' => 'nullable|string|max:20',
+            'items'          => 'required|array|min:1',
             'items.*.product_id'   => 'required|exists:products,id',
             'items.*.quantity'     => 'required|integer|min:1',
             'items.*.notes'        => 'nullable|string',
@@ -81,14 +83,16 @@ class OrderController extends Controller
 
         $order = DB::transaction(function () use ($request) {
             $order = Order::create([
-                'restaurant_id' => $request->user()->restaurant_id,
-                'table_id'      => $request->table_id,
-                'user_id'       => $request->user()->id,
-                'order_number'  => Order::generateNumber($request->user()->restaurant_id),
-                'type'          => $request->type,
-                'covers'        => $request->covers ?? 1,
-                'notes'         => $request->notes,
-                'status'        => 'open',
+                'restaurant_id'  => $request->user()->restaurant_id,
+                'table_id'       => $request->table_id,
+                'user_id'        => $request->user()->id,
+                'order_number'   => Order::generateNumber($request->user()->restaurant_id),
+                'type'           => $request->type,
+                'covers'         => $request->covers ?? 1,
+                'notes'          => $request->notes,
+                'customer_name'  => $request->customer_name,
+                'customer_phone' => $request->customer_phone,
+                'status'         => 'open',
             ]);
 
             foreach ($request->items as $itemData) {
@@ -276,9 +280,31 @@ class OrderController extends Controller
     {
         $this->authorizeOrder($request, $order);
 
-        $request->validate(['status' => 'required|in:open,sent_to_kitchen,partially_served,served,paid,cancelled']);
+        $request->validate([
+            'status' => 'required|in:open,sent_to_kitchen,partially_served,served,paid,cancelled',
+            'reason' => 'required_if:status,cancelled|string|min:5'
+        ], [
+            'reason.required_if' => 'Un motif d\'annulation est obligatoire.'
+        ]);
 
+        $oldStatus = $order->status;
         $order->update(['status' => $request->status]);
+
+        if ($request->status === 'cancelled') {
+            $order->logActivity('order_cancelled', "Commande {$order->order_number} annulée. Motif: {$request->reason}");
+            // Si la table était occupée, on la libère si c'est la seule commande ouverte
+            if ($order->table_id) {
+                $otherOpen = Order::where('table_id', $order->table_id)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served'])
+                    ->exists();
+                if (!$otherOpen) {
+                    $order->table->update(['status' => 'available', 'occupied_since' => null, 'assigned_user_id' => null]);
+                }
+            }
+        } else {
+            $order->logActivity('status_updated', "Statut {$oldStatus} → {$request->status}");
+        }
 
         return response()->json($order);
     }

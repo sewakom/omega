@@ -54,17 +54,57 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('payments',       [Api\PaymentController::class, 'store']);
     Route::post('payments/split', [Api\PaymentController::class, 'split']);
 
-    // Caisse
-    Route::get('cash-sessions/current',          [Api\CashSessionController::class, 'current']);
-    Route::post('cash-sessions/open',            [Api\CashSessionController::class, 'open']);
-    Route::get('cash-sessions',                  [Api\CashSessionController::class, 'index']);
-    Route::post('cash-sessions/{session}/close', [Api\CashSessionController::class, 'close']);
+    // ------------------------------------------------
+    // CAISSE — Sessions + Dépenses + Rapport
+    // ------------------------------------------------
+    Route::get('cash-sessions/current',                    [Api\CashSessionController::class, 'current']);
+    Route::post('cash-sessions/open',                      [Api\CashSessionController::class, 'open']);
+    Route::get('cash-sessions',                            [Api\CashSessionController::class, 'index']);
+    Route::post('cash-sessions/{session}/close',           [Api\CashSessionController::class, 'close']);
+    Route::post('cash-sessions/{session}/send-report',     [Api\CashSessionController::class, 'sendReport']);
+    Route::get('cash-sessions/{session}/report-preview',   [Api\CashSessionController::class, 'reportPreview']);
 
-    // Cuisine KDS
+    // Dépenses de caisse
+    Route::get('expenses',              [Api\ExpenseController::class, 'index']);
+    Route::post('expenses',             [Api\ExpenseController::class, 'store']);
+    Route::delete('expenses/{expense}', [Api\ExpenseController::class, 'destroy']);
+    Route::get('expenses/summary',      [Api\ExpenseController::class, 'summary']);
+
+    // ------------------------------------------------
+    // CUISINE / BAR / PIZZA — KDS par destination
+    // ------------------------------------------------
     Route::prefix('kitchen')->group(function () {
-        Route::get('orders',                      [Api\KitchenController::class, 'orders']);
-        Route::put('items/{item}/status',         [Api\KitchenController::class, 'updateItemStatus']);
-        Route::put('orders/{order}/validate-all', [Api\KitchenController::class, 'validateAll']);
+        // ?destination=kitchen|bar|pizza
+        Route::get('orders',                                  [Api\KitchenController::class, 'orders']);
+        Route::put('items/{item}/status',                     [Api\KitchenController::class, 'updateItemStatus']);
+        Route::put('orders/{order}/validate-all',             [Api\KitchenController::class, 'validateAll']);
+        // Ticket impression SANS prix pour une destination
+        Route::get('orders/{order}/ticket',                   [Api\KitchenController::class, 'ticket']);
+    });
+
+    // ------------------------------------------------
+    // ARDOISES CLIENTS (Consommation Différée)
+    // ------------------------------------------------
+    Route::prefix('tabs')->group(function () {
+        Route::get('/',                           [Api\CustomerTabController::class, 'index']);
+        Route::post('/',                          [Api\CustomerTabController::class, 'store']);
+        Route::get('/{tab}',                      [Api\CustomerTabController::class, 'show']);
+        Route::post('/{tab}/attach-order',        [Api\CustomerTabController::class, 'attachOrder']);
+        Route::post('/{tab}/pay',                 [Api\CustomerTabController::class, 'pay']);
+        Route::get('/{tab}/invoice',              [Api\CustomerTabController::class, 'invoice']);
+        Route::post('/{tab}/cancel',              [Api\CustomerTabController::class, 'cancel']);
+    });
+
+    // ------------------------------------------------
+    // COMMANDES GÂTEAUX
+    // ------------------------------------------------
+    Route::prefix('cake-orders')->group(function () {
+        Route::get('/',                               [Api\CakeOrderController::class, 'index']);
+        Route::post('/',                              [Api\CakeOrderController::class, 'store']);
+        Route::get('/{cakeOrder}',                    [Api\CakeOrderController::class, 'show']);
+        Route::patch('/{cakeOrder}/status',           [Api\CakeOrderController::class, 'updateStatus']);
+        Route::post('/{cakeOrder}/collect',           [Api\CakeOrderController::class, 'collect']);
+        Route::get('/{cakeOrder}/ticket',             [Api\CakeOrderController::class, 'ticket']);
     });
 
     // Catégories
@@ -114,13 +154,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('cash-summary', [Api\ReportController::class, 'cashSummary']);
     });
 
-    // Reçus
+    // Reçus & Tickets
     Route::prefix('receipts')->group(function () {
-        Route::get('{orderId}',            [Api\ReceiptController::class, 'show']);
-        Route::get('{orderId}/pdf',        [Api\ReceiptController::class, 'pdf']);
-        Route::get('{orderId}/html',       [Api\ReceiptController::class, 'html']);
-        Route::post('{orderId}/send-sms',  [Api\ReceiptController::class, 'sendSms']);
-        Route::post('{orderId}/send-email',[Api\ReceiptController::class, 'sendEmail']);
+        Route::get('{orderId}',             [Api\ReceiptController::class, 'show']);
+        Route::get('{orderId}/pdf',         [Api\ReceiptController::class, 'pdf']);
+        Route::get('{orderId}/html',        [Api\ReceiptController::class, 'html']);
+        Route::get('{orderId}/a4',          [Api\ReceiptController::class, 'invoiceA4']);
+        Route::post('{orderId}/send-email', [Api\ReceiptController::class, 'sendEmail']);
+        // Tickets cuisine SANS prix par destination
+        Route::get('{orderId}/kitchen-ticket', [Api\ReceiptController::class, 'kitchenTicket']);
     });
 
     // QR Code
@@ -142,7 +184,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Audit Trail
     Route::prefix('activity-logs')->group(function () {
         Route::get('/',                   [Api\ActivityLogController::class, 'index']);
-        Route::get('summary',            [Api\ActivityLogController::class, 'summary']);
+        Route::get('summary',             [Api\ActivityLogController::class, 'summary']);
         Route::get('subject/{type}/{id}', [Api\ActivityLogController::class, 'forSubject']);
     });
 

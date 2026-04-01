@@ -5,28 +5,37 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CashSession;
 use App\Models\Payment;
+use App\Models\Expense;
+use App\Services\DailyReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CashSessionController extends Controller
 {
+    public function __construct(protected DailyReportService $reportService) {}
+
+    /** Session courante avec tous les totaux */
     public function current(Request $request)
     {
         $session = CashSession::where('restaurant_id', $request->user()->restaurant_id)
-            ->whereNull('closed_at')->with('user:id,first_name,last_name')->latest()->first();
+            ->whereNull('closed_at')
+            ->with('user:id,first_name,last_name')
+            ->latest()
+            ->first();
 
         if (!$session) return response()->json(null);
 
-        $cashIn  = Payment::where('cash_session_id', $session->id)->where('method', 'cash')->sum('amount');
-        $expected = $session->opening_amount + $cashIn;
+        $totals = $this->computeTotals($session);
 
         return response()->json([
-            'session'          => $session,
-            'cash_in'          => $cashIn,
-            'expected_amount'  => $expected,
-            'orders_count'     => Payment::where('cash_session_id', $session->id)->distinct('order_id')->count(),
+            'session'       => $session,
+            'totals'        => $totals,
+            'orders_count'  => Payment::where('cash_session_id', $session->id)->distinct('order_id')->count(),
+            'expenses_total'=> Expense::where('cash_session_id', $session->id)->sum('amount'),
         ]);
     }
 
+    /** Ouvrir une session de caisse */
     public function open(Request $request)
     {
         $existing = CashSession::where('restaurant_id', $request->user()->restaurant_id)
@@ -47,36 +56,88 @@ class CashSessionController extends Controller
         return response()->json($session, 201);
     }
 
+    /** Fermer la session + totaux par méthode + email optionnel */
     public function close(Request $request, CashSession $session)
     {
         abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
-        abort_if($session->closed_at, 422, 'Session déjà fermée.');
+        abort_if((bool) $session->closed_at, 422, 'Session déjà fermée.');
         abort_unless($request->user()->isManager(), 403, 'Manager requis pour fermer la caisse.');
 
         $request->validate([
             'closing_amount' => 'required|numeric|min:0',
             'notes'          => 'nullable|string',
+            'send_report_to' => 'nullable|email',
         ]);
 
-        $cashIn   = Payment::where('cash_session_id', $session->id)->where('method', 'cash')->sum('amount');
+        // Calcul des totaux par méthode de paiement
+        $totals   = $this->computeTotals($session);
+        $cashIn   = $totals['cash'] ?? 0;
         $expected = $session->opening_amount + $cashIn;
         $diff     = $request->closing_amount - $expected;
+        $expenses = Expense::where('cash_session_id', $session->id)->sum('amount');
 
-        $session->update([
-            'closing_amount'  => $request->closing_amount,
-            'expected_amount' => $expected,
-            'difference'      => $diff,
-            'closing_notes'   => $request->notes,
-            'closed_at'       => now(),
-        ]);
+        DB::transaction(function () use ($session, $request, $totals, $expected, $diff, $expenses) {
+            $session->update([
+                'closing_amount'      => $request->closing_amount,
+                'expected_amount'     => $expected,
+                'difference'          => $diff,
+                'closing_notes'       => $request->notes,
+                'closed_at'           => now(),
+                'cash_total'          => $totals['cash'] ?? 0,
+                'card_total'          => $totals['card'] ?? 0,
+                'wave_total'          => $totals['wave'] ?? 0,
+                'orange_money_total'  => $totals['orange_money'] ?? 0,
+                'momo_total'          => $totals['momo'] ?? 0,
+                'other_total'         => $totals['other'] ?? 0,
+                'total_expenses'      => $expenses,
+            ]);
+        });
 
         $session->logActivity('cash_session_closed',
-            "Session caisse fermée. Attendu: {$expected} | Compté: {$request->closing_amount} | Écart: {$diff}"
+            "Session fermée. Attendu: {$expected} | Compté: {$request->closing_amount} | Écart: {$diff}"
         );
 
-        return response()->json($session);
+        // Envoi email rapport
+        $emailSent = false;
+        $emailTo   = $request->send_report_to;
+        if ($emailTo) {
+            $emailSent = $this->reportService->sendReportByEmail($session, $emailTo);
+        }
+
+        return response()->json([
+            'session'    => $session->fresh(),
+            'totals'     => $totals,
+            'email_sent' => $emailSent,
+            'email_to'   => $emailTo,
+        ]);
     }
 
+    /** Envoyer le rapport d'une session fermée par email */
+    public function sendReport(Request $request, CashSession $session)
+    {
+        abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
+
+        $request->validate(['email' => 'required|email']);
+
+        $sent = $this->reportService->sendReportByEmail($session, $request->email);
+
+        return response()->json([
+            'message'  => $sent ? 'Rapport envoyé avec succès.' : 'Échec de l\'envoi.',
+            'sent'     => $sent,
+        ]);
+    }
+
+    /** Prévisualisation du rapport A4 (HTML) */
+    public function reportPreview(Request $request, CashSession $session)
+    {
+        abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
+
+        $html = $this->reportService->generateSessionReportHtml($session);
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
+    /** Historique des sessions */
     public function index(Request $request)
     {
         $sessions = CashSession::with('user:id,first_name,last_name')
@@ -86,5 +147,24 @@ class CashSessionController extends Controller
             ->paginate(20);
 
         return response()->json($sessions);
+    }
+
+    /** Calculer les totaux par méthode pour une session */
+    private function computeTotals(CashSession $session): array
+    {
+        $rows = Payment::where('cash_session_id', $session->id)
+            ->selectRaw('method, SUM(amount) as total')
+            ->groupBy('method')
+            ->pluck('total', 'method')
+            ->toArray();
+
+        // Normaliser toutes les méthodes
+        $methods = ['cash', 'card', 'wave', 'orange_money', 'momo', 'other'];
+        $totals  = [];
+        foreach ($methods as $m) {
+            $totals[$m] = round($rows[$m] ?? 0, 2);
+        }
+        $totals['grand_total'] = array_sum($totals);
+        return $totals;
     }
 }

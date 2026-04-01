@@ -11,7 +11,31 @@ class Category extends Model
 
     const AUDIT_MODULE = 'category';
 
-    protected $fillable = ['restaurant_id', 'parent_id', 'name', 'image', 'order', 'active'];
+    protected $fillable = ['restaurant_id', 'parent_id', 'name', 'image', 'order', 'active', 'destination', 'color'];
+
+    protected $casts = [
+        'active' => 'boolean',
+    ];
+
+    // Labels destination
+    public static function destinationLabels(): array
+    {
+        return [
+            'kitchen' => 'Cuisine 🍳',
+            'bar'     => 'Bar 🍺',
+            'pizza'   => 'Pizza 🍕',
+        ];
+    }
+
+    // Couleurs par défaut si non renseignées
+    public static function destinationColors(): array
+    {
+        return [
+            'kitchen' => '#FF6B35',
+            'bar'     => '#2196F3',
+            'pizza'   => '#E53935',
+        ];
+    }
 
     public function restaurant() { return $this->belongsTo(Restaurant::class); }
     public function parent()     { return $this->belongsTo(Category::class, 'parent_id'); }

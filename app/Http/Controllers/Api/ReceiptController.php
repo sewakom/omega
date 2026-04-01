@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\TicketPrintService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 
 class ReceiptController extends Controller
 {
+    public function __construct(protected TicketPrintService $ticketService) {}
+
     public function show(Request $request, int $orderId)
     {
         $order = Order::with(['items' => fn($q) => $q->whereNotIn('status', ['cancelled']), 'items.product:id,name,vat_rate', 'items.modifiers.modifier:id,name,extra_price', 'payments', 'table:id,number', 'waiter:id,first_name,last_name', 'cashier:id,first_name,last_name'])
@@ -53,7 +56,7 @@ class ReceiptController extends Controller
     {
         $request->validate(['phone' => 'required|string|min:8']);
         $order = Order::where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
-        $order->logs()->create(['user_id' => auth()->id(), 'action' => 'receipt_sms', 'message' => "Reçu envoyé par SMS au {$request->phone}"]);
+        $order->logs()->create(['user_id' => $request->user()->id, 'action' => 'receipt_sms', 'message' => "Reçu envoyé par SMS au {$request->phone}"]);
         return response()->json(['message' => 'Reçu envoyé par SMS.']);
     }
 
@@ -99,6 +102,36 @@ class ReceiptController extends Controller
         ];
     }
 
+    /** Facture A4 normalisée */
+    public function invoiceA4(Request $request, int $orderId)
+    {
+        $order = Order::with(['items.product', 'payments', 'table', 'restaurant', 'waiter'])
+            ->where('restaurant_id', $request->user()->restaurant_id)
+            ->findOrFail($orderId);
+
+        $html = $this->ticketService->invoiceA4Html($order);
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
+    /** Ticket cuisine/bar/pizza SANS PRIX */
+    public function kitchenTicket(Request $request, int $orderId)
+    {
+        $order = Order::with(['items.product.category', 'table', 'waiter'])
+            ->where('restaurant_id', $request->user()->restaurant_id)
+            ->findOrFail($orderId);
+
+        $destination = $request->get('destination', 'kitchen');
+        abort_unless(in_array($destination, ['kitchen', 'bar', 'pizza']), 422, 'Destination invalide.');
+
+        $html = $this->ticketService->kitchenTicketHtml($order, $destination);
+
+        if (!$html) {
+            return response()->json(['message' => "Aucun item pour '{$destination}'."], 404);
+        }
+
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
     private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', default => 'Autre' }; }
-    private function typeLabel(string $type): string { return match($type) { 'dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'delivery' => 'Livraison', default => $type }; }
+    private function typeLabel(string $type): string { return match($type) { 'dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'gozem' => 'Gozem', 'delivery' => 'Livraison', default => $type }; }
 }

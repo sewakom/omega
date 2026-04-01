@@ -26,7 +26,14 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate(['name' => 'required|string|max:100', 'parent_id' => 'nullable|exists:categories,id', 'image' => 'nullable|image|max:2048', 'order' => 'integer|min:0']);
+        $request->validate([
+            'name'        => 'required|string|max:100',
+            'parent_id'   => 'nullable|exists:categories,id',
+            'image'       => 'nullable|image|max:2048',
+            'order'       => 'integer|min:0',
+            'destination' => 'nullable|in:kitchen,bar,pizza',
+            'color'       => 'nullable|string|max:20'
+        ]);
 
         $imagePath = null;
         if ($request->hasFile('image')) {
@@ -35,8 +42,12 @@ class CategoryController extends Controller
 
         $category = Category::create([
             'restaurant_id' => $request->user()->restaurant_id,
-            'name' => $request->name, 'parent_id' => $request->parent_id,
-            'image' => $imagePath, 'order' => $request->order ?? 0,
+            'name'          => $request->name,
+            'parent_id'     => $request->parent_id,
+            'image'         => $imagePath,
+            'order'         => $request->order ?? 0,
+            'destination'   => $request->destination ?? 'kitchen',
+            'color'         => $request->color,
         ]);
 
         return response()->json($category, 201);
@@ -52,7 +63,7 @@ class CategoryController extends Controller
             $request->merge(['image' => $request->file('image')->store("restaurants/{$category->restaurant_id}/categories", 'public')]);
         }
 
-        $category->update($request->only(['name', 'parent_id', 'order', 'active', 'image']));
+        $category->update($request->only(['name', 'parent_id', 'order', 'active', 'image', 'destination', 'color']));
         return response()->json($category);
     }
 

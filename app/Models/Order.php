@@ -16,6 +16,7 @@ class Order extends Model
     protected $fillable = [
         'restaurant_id', 'table_id', 'user_id', 'cashier_id',
         'order_number', 'type', 'status', 'covers',
+        'customer_name', 'customer_phone',
         'subtotal', 'discount_amount', 'discount_reason',
         'vat_amount', 'total', 'notes',
         'sent_to_kitchen_at', 'served_at', 'paid_at',
@@ -41,6 +42,7 @@ class Order extends Model
     public function logs()         { return $this->hasMany(OrderLog::class)->latest(); }
     public function delivery()     { return $this->hasOne(Delivery::class); }
     public function cancellations(){ return $this->morphMany(Cancellation::class, 'cancellable'); }
+    public function customerTabs() { return $this->belongsToMany(CustomerTab::class, 'customer_tab_orders'); }
 
     // Scopes
     public function scopeOpen($q)   { return $q->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served']); }
