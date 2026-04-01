@@ -102,18 +102,17 @@ class RestaurantSeeder extends Seeder
 
         // 4. Salle et Tables
         $floor = Floor::create(['restaurant_id' => $restaurant->id, 'name' => 'Salle principale', 'order' => 1]);
-        $tablePositions = [
-            ['number' => '1', 'cap' => 4, 'x' => 50, 'y' => 60],
-            ['number' => '2', 'cap' => 4, 'x' => 200, 'y' => 60],
-            ['number' => '3', 'cap' => 2, 'x' => 350, 'y' => 60],
-            ['number' => '4', 'cap' => 6, 'x' => 500, 'y' => 60],
-            ['number' => 'T1', 'cap' => 10, 'x' => 250, 'y' => 250, 'shape' => 'round'],
-        ];
-        foreach ($tablePositions as $t) {
+        
+        for ($i = 1; $i <= 100; $i++) {
             Table::create([
-                'floor_id' => $floor->id, 'number' => $t['number'], 'capacity' => $t['cap'],
-                'position_x' => $t['x'], 'position_y' => $t['y'], 'width' => 100, 'height' => 80,
-                'shape' => $t['shape'] ?? 'rectangle',
+                'floor_id'   => $floor->id,
+                'number'     => (string) $i,
+                'capacity'   => ($i % 6 === 0) ? 8 : (($i % 4 === 0) ? 6 : 4),
+                'position_x' => (($i - 1) % 10) * 130 + 50,
+                'position_y' => floor(($i - 1) / 10) * 110 + 50,
+                'width'      => 100,
+                'height'     => 80,
+                'shape'      => ($i % 10 === 0) ? 'round' : 'rectangle',
             ]);
         }
 
