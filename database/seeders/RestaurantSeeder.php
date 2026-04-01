@@ -100,21 +100,8 @@ class RestaurantSeeder extends Seeder
             ]);
         }
 
-        // 4. Salle et Tables
-        $floor = Floor::create(['restaurant_id' => $restaurant->id, 'name' => 'Salle principale', 'order' => 1]);
-        
-        for ($i = 1; $i <= 100; $i++) {
-            Table::create([
-                'floor_id'   => $floor->id,
-                'number'     => (string) $i,
-                'capacity'   => ($i % 6 === 0) ? 8 : (($i % 4 === 0) ? 6 : 4),
-                'position_x' => (($i - 1) % 10) * 130 + 50,
-                'position_y' => floor(($i - 1) / 10) * 110 + 50,
-                'width'      => 100,
-                'height'     => 80,
-                'shape'      => ($i % 10 === 0) ? 'round' : 'rectangle',
-            ]);
-        }
+        // 4. Salle et Tables (Désormais géré séparément via TableSeeder)
+        $this->command->info("L'initialisation des tables se fait désormais avec : php artisan db:seed --class=TableSeeder");
 
         // 5. Ingrédients (Stock)
         $ingredientsData = [
