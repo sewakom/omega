@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Omega POS API</title>
+        <title>smartflow POS API</title>
         <style>
             body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #0F172A; color: white; margin: 0; }
             .badge { background: #16A34A; padding: 6px 12px; rounded-full: 9999px; font-size: 12px; font-weight: bold; margin-bottom: 20px; }
@@ -13,7 +13,7 @@
     </head>
     <body>
         <div class="badge">API STATUS : ONLINE</div>
-        <h1>OMEGA POS BACKEND</h1>
+        <h1>smartflow POS BACKEND</h1>
         <p>Veuillez utiliser l'application terminale pour exécuter les commandes.</p>
     </body>
 </html>

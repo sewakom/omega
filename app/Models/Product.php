@@ -13,7 +13,7 @@ class Product extends Model
     const AUDIT_MODULE = 'product';
 
     protected $fillable = [
-        'restaurant_id', 'category_id', 'name', 'description', 'image',
+        'restaurant_id', 'category_id', 'name', 'description', 'image', 'emoji',
         'price', 'cost_price', 'vat_rate', 'sku', 'available',
         'track_stock', 'quantity', 'min_quantity', 'order', 'active'
     ];
@@ -25,6 +25,13 @@ class Product extends Model
         'min_quantity'=> 'decimal:3',
         'active'      => 'boolean'
     ];
+
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
+    }
 
     public function restaurant()     { return $this->belongsTo(Restaurant::class); }
     public function category()       { return $this->belongsTo(Category::class); }

@@ -16,10 +16,17 @@ class Restaurant extends Model
         'vat_number', 'currency', 'timezone', 'settings', 'active'
     ];
 
+    protected $appends = ['logo_url'];
+
     protected $casts = [
         'settings' => 'json',
         'active'   => 'boolean'
     ];
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo ? asset('storage/' . $this->logo) : null;
+    }
 
     public function users() { return $this->hasMany(User::class); }
     public function floors() { return $this->hasMany(Floor::class); }

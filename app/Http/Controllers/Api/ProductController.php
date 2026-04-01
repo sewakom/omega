@@ -80,6 +80,7 @@ class ProductController extends Controller
             'min_quantity'  => $request->min_quantity ?? 0,
             'available'     => $request->boolean('available', true),
             'image'         => $imagePath,
+            'emoji'         => $request->emoji ?? '🍽️',
         ]);
 
         if ($request->modifier_groups) {
@@ -127,7 +128,7 @@ class ProductController extends Controller
 
         $product->update($request->only([
             'name', 'description', 'price', 'cost_price', 'vat_rate',
-            'category_id', 'available', 'track_stock', 'image', 'order',
+            'category_id', 'available', 'track_stock', 'image', 'order', 'emoji'
         ]));
 
         return response()->json($product->fresh('modifierGroups.modifiers'));
