@@ -65,38 +65,49 @@ class TicketPrintService
             ? "<div class='order-note'>📝 {$order->notes}</div>"
             : '';
 
+        $restaurant = $order->restaurant;
+        $logoHtml = $restaurant->logo 
+            ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
+            : "<div style='font-size:16px;font-weight:900;text-transform:uppercase;opacity:0.2;transform:rotate(-15deg);position:absolute;z-index:-1;top:50%;left:10%;right:10%;text-align:center;'>{$restaurant->name}</div>";
+
+        $restaurant = $order->restaurant;
+        $restoPhone = $restaurant->phone ? " | Tél: {$restaurant->phone}" : '';
+        
         return "<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 12px; width: 58mm; padding: 4px; }
-  .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
-  .destination { font-size: 16px; font-weight: bold; letter-spacing: 2px; }
-  .order-num { font-size: 11px; margin-top: 2px; }
-  .meta { font-size: 10px; color: #333; }
+  body { font-family: 'Courier New', monospace; font-size: 13px; width: 58mm; padding: 4px; overflow: hidden; position: relative; }
+  .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 6px; margin-bottom: 6px; position: relative; }
+  .destination { font-size: 18px; font-weight: bold; letter-spacing: 2px; }
+  .order-num { font-size: 12px; margin-top: 2px; font-weight: bold; }
+  .meta { font-size: 11px; color: #000; font-weight: 800; border: 1px solid #000; display: inline-block; padding: 2px 8px; margin-top: 4px; }
   .divider { border-top: 1px dashed #000; margin: 4px 0; }
-  .item { display: flex; gap: 6px; padding: 3px 0; align-items: flex-start; }
-  .qty { font-weight: bold; font-size: 14px; min-width: 22px; }
-  .name { font-size: 12px; font-weight: bold; flex: 1; }
-  .note { font-size: 10px; color: #555; padding-left: 28px; font-style: italic; }
-  .customer { margin-top: 6px; font-size: 10px; border-top: 1px dashed #000; padding-top: 4px; }
-  .order-note { font-size: 11px; font-style: italic; border-top: 1px dashed #000; padding-top: 4px; margin-top: 4px; }
+  .item { display: flex; gap: 8px; padding: 5px 0; align-items: flex-start; border-bottom: 0.5px solid #eee; }
+  .qty { font-weight: 900; font-size: 18px; min-width: 25px; }
+  .name { font-size: 14px; font-weight: 900; flex: 1; text-transform: uppercase; }
+  .note { font-size: 11px; color: #000; padding-left: 33px; font-weight: bold; font-style: italic; }
+  .customer { margin-top: 8px; font-size: 10px; border-top: 1px dashed #000; padding-top: 4px; }
+  .order-note { font-size: 12px; font-weight: bold; border: 2px solid #000; padding: 4px; margin-top: 6px; }
+  .footer-name { text-align: center; font-size: 10px; font-weight: bold; margin-top: 10px; text-transform: uppercase; border-top: 1px solid #000; padding-top: 4px; }
   @media print { @page { margin: 0; } }
 </style>
 </head>
 <body>
+  {$logoHtml}
   <div class='header'>
     <div class='destination'>{$icon} {$label}</div>
     <div class='order-num'>#{$order->order_number}</div>
-    <div class='meta'>{$table} | {$date} {$time}</div>
+    <div class='meta'>LOCATION: {$table}{$restoPhone}</div>
   </div>
   <div class='items'>
     {$itemsHtml}
   </div>
   {$orderNote}
   {$customerInfo}
+  <div class='footer-name'>{$restaurant->name} — Omega POS</div>
 </body>
 </html>";
     }
@@ -133,11 +144,20 @@ class TicketPrintService
 
         $table       = $order->table ? "Table {$order->table->number}" : ucfirst($order->type);
         $subtotal    = number_format((float) $order->subtotal, 0, ',', ' ');
+        $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
         $vat         = number_format((float) $order->vat_amount, 0, ',', ' ');
         $total       = number_format((float) $order->total, 0, ',', ' ');
         $date        = now()->format('d/m/Y H:i');
         $cashier     = $order->waiter?->first_name ?? 'Caisse';
         $restoAddress = $restaurant->address ?? '';
+
+        $logoHtml = $restaurant->logo 
+            ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
+            : "<div style='font-size:16px;font-weight:900;text-transform:uppercase;opacity:0.1;transform:rotate(-15deg);position:absolute;z-index:-1;top:50%;left:10%;right:10%;text-align:center;'>{$restaurant->name}</div>";
+
+
+        $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci de votre visite !';
+        $restoPhoneHtml = $restaurant->phone ? "<div>Tél: {$restaurant->phone}</div>" : '';
 
         return "<!DOCTYPE html>
 <html>
@@ -145,35 +165,38 @@ class TicketPrintService
 <meta charset='UTF-8'>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 58mm; padding: 4px; }
-  .header { text-align: center; margin-bottom: 6px; }
-  .resto-name { font-size: 14px; font-weight: bold; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 58mm; padding: 4px; position: relative; overflow: hidden; }
+  .header { text-align: center; margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px; }
+  .resto-name { font-size: 15px; font-weight: bold; text-transform: uppercase; }
   .line { display: flex; justify-content: space-between; padding: 2px 0; }
   .divider { border-top: 1px dashed #000; margin: 4px 0; }
-  .total-line { font-weight: bold; font-size: 13px; }
-  .footer { text-align: center; margin-top: 6px; font-size: 10px; }
+  .total-line { font-weight: bold; font-size: 14px; }
+  .footer { text-align: center; margin-top: 10px; font-size: 10px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; }
+  .table-box { border: 2px solid #000; font-weight: 900; text-align: center; padding: 4px; margin: 4px 0; font-size: 14px; }
   @media print { @page { margin: 0; } }
 </style>
 </head>
 <body>
+  {$logoHtml}
   <div class='header'>
     <div class='resto-name'>{$restaurant->name}</div>
-    <div>{$restoAddress}</div>
-    <div>{$date}</div>
+    <div style='font-size:9px'>{$restoAddress}</div>
+    <div style='font-size:9px'>{$restoPhoneHtml}</div>
+    <div style='font-size:9px'>{$date}</div>
   </div>
-  <div class='divider'></div>
-  <div class='line'><span>{$table}</span><span>#{$order->order_number}</span></div>
+  <div class='table-box'>{$table}</div>
+  <div class='line'><span>Ticket</span><span>#{$order->order_number}</span></div>
   <div class='line'><span>Caissier: {$cashier}</span></div>
   <div class='divider'></div>
   {$itemsHtml}
   <div class='divider'></div>
   <div class='line'><span>Sous-total</span><span>{$subtotal} FCFA</span></div>
-  <div class='line'><span>TVA (18%)</span><span>{$vat} FCFA</span></div>
+  <div class='line'><span>TVA ({$vatRate}%)</span><span>{$vat} FCFA</span></div>
   <div class='divider'></div>
   <div class='line total-line'><span>TOTAL</span><span>{$total} FCFA</span></div>
   <div class='divider'></div>
   {$paymentsHtml}
-  <div class='footer'>Merci de votre visite !<br>Revenez nous voir !</div>
+  <div class='footer'>{$thanksMsg}<br>{$restaurant->name}</div>
 </body>
 </html>";
     }
@@ -212,6 +235,7 @@ class TicketPrintService
 
         $table       = $order->table ? "Table {$order->table->number}" : ucfirst(str_replace('_', ' ', $order->type));
         $subtotal    = number_format((float) $order->subtotal, 0, ',', ' ');
+        $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
         $vat         = number_format((float) $order->vat_amount, 0, ',', ' ');
         $discount    = $order->discount_amount > 0 ? number_format((float) $order->discount_amount, 0, ',', ' ') : null;
         $total       = number_format((float) $order->total, 0, ',', ' ');
@@ -229,39 +253,48 @@ class TicketPrintService
             $customerBlock = "<div class='customer-block'><strong>Client:</strong> {$order->customer_name} | {$order->customer_phone}</div>";
         }
 
+        $logoHtml = $restaurant->logo 
+            ? "<img src='{$restaurant->logo}' style='max-height:25mm;'>" 
+            : "<div style='font-size:40px;font-weight:900;text-transform:uppercase;opacity:0.05;transform:rotate(-30deg);position:absolute;z-index:-1;top:40%;left:5%;right:5%;text-align:center;'>{$restaurant->name}</div>";
+
+        $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance';
+
         return "<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 20mm 15mm; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 20mm 15mm; position: relative; overflow: hidden; }
   .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-  .resto-info h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 4px; }
+  .resto-info h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; text-transform: uppercase; }
   .invoice-info { text-align: right; }
-  .invoice-info h2 { font-size: 18px; color: #16213e; }
+  .invoice-info h2 { font-size: 20px; color: #16213e; margin-bottom: 10px; }
   .divider { border: none; border-top: 2px solid #1a1a2e; margin: 10px 0; }
-  .customer-block { background: #f5f5f5; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; }
+  .customer-block { background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #1a1a2e; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th { background: #1a1a2e; color: white; padding: 8px; text-align: left; }
-  td { padding: 7px 8px; border-bottom: 1px solid #eee; }
-  .totals-table td { border: none; padding: 4px 8px; }
-  .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #1a1a2e; }
-  .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #666; }
+  th { background: #1a1a2e; color: white; padding: 10px; text-align: left; }
+  td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+  .totals-table td { border: none; padding: 5px 10px; }
+  .total-row td { font-weight: bold; font-size: 16px; border-top: 2px solid #1a1a2e; padding-top: 10px; }
+  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #666; border-top: 1px solid #eee; padding-top: 15px; }
+  .table-badge { background: #1a1a2e; color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; }
   @media print { @page { size: A4; margin: 15mm; } }
 </style>
 </head>
 <body>
+  {$logoHtml}
   <div class='header'>
     <div class='resto-info'>
       <h1>{$restaurant->name}</h1>
       <div>{$restoAddr}</div>
-      <div>{$restoPhone}</div>
+      <div>Tél: {$restaurant->phone}</div>
+      <div>{$restaurant->email}</div>
     </div>
     <div class='invoice-info'>
       <h2>FACTURE</h2>
+      <div style='margin-bottom:8px'><span class='table-badge'>{$table}</span></div>
       <div>N° {$invoiceNum}</div>
       <div>Date: {$date}</div>
-      <div>{$table}</div>
     </div>
   </div>
   <hr class='divider'>
@@ -270,7 +303,7 @@ class TicketPrintService
     <thead>
       <tr>
         <th>#</th>
-        <th>Article</th>
+        <th>Article / Description</th>
         <th style='text-align:center'>Qté</th>
         <th style='text-align:right'>P.U. (FCFA)</th>
         <th style='text-align:right'>Total (FCFA)</th>
@@ -280,20 +313,20 @@ class TicketPrintService
       {$itemsHtml}
     </tbody>
   </table>
-  <table class='totals-table' style='width:40%; margin-left:60%; margin-top:10px;'>
+  <table class='totals-table' style='width:45%; margin-left:55%; margin-top:20px;'>
     <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
     {$discountRow}
-    <tr><td>TVA (18%)</td><td style='text-align:right'>{$vat} FCFA</td></tr>
-    <tr class='total-row'><td>TOTAL</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr><td>TVA ({$vatRate}%)</td><td style='text-align:right'>{$vat} FCFA</td></tr>
+    <tr class='total-row'><td>TOTAL À PAYER</td><td style='text-align:right'>{$total} FCFA</td></tr>
   </table>
-  <div style='margin-top:20px;'>
-    <strong>Mode(s) de paiement:</strong>
-    <table style='width:40%;'>
+  <div style='margin-top:40px;'>
+    <h3 style='border-bottom:1px solid #eee; padding-bottom:5px; font-size:12px; margin-bottom:10px;'>DÉTAILS PAIEMENT</h3>
+    <table style='width:50%;'>
       {$paymentsHtml}
     </table>
   </div>
   <div class='footer'>
-    Merci pour votre confiance — {$restaurant->name}
+    {$thanksMsg} — {$restaurant->name} — Document certifié
   </div>
 </body>
 </html>";

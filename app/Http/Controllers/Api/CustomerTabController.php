@@ -159,9 +159,14 @@ class CustomerTabController extends Controller
         $restaurant = $tab->restaurant;
         $orders     = $tab->orders;
 
+        $totalVat = 0;
+        $subtotalNoVat = 0;
+
         $allItemsHtml = '';
         $i = 1;
         foreach ($orders as $order) {
+            $totalVat += (float) $order->vat_amount;
+            $subtotalNoVat += (float) $order->subtotal;
             foreach ($order->items->whereNotIn('status', ['cancelled']) as $item) {
                 $price    = number_format($item->unit_price, 0, ',', ' ');
                 $subtotal = number_format($item->quantity * $item->unit_price, 0, ',', ' ');
@@ -179,9 +184,11 @@ class CustomerTabController extends Controller
             }
         }
 
-        $total       = number_format($tab->total_amount, 0, ',', ' ');
-        $paid        = number_format($tab->paid_amount, 0, ',', ' ');
-        $remaining   = number_format($tab->remainingAmount(), 0, ',', ' ');
+        $total       = number_format((float) $tab->total_amount, 0, ',', ' ');
+        $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
+        $vatAmt      = number_format((float) $totalVat, 0, ',', ' ');
+        $paid        = number_format((float) $tab->paid_amount, 0, ',', ' ');
+        $remaining   = number_format((float) $tab->remainingAmount(), 0, ',', ' ');
         $date        = now()->format('d/m/Y');
         $restoAddr   = $restaurant->address ?? '';
 
@@ -228,7 +235,9 @@ class CustomerTabController extends Controller
     <tbody>{$allItemsHtml}</tbody>
   </table>
   <table class='total-bloc'>
-    <tr><td>Total consommé</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr><td>Total HT</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr><td>TVA ({$vatRate}%)</td><td style='text-align:right'>{$vatAmt} FCFA</td></tr>
+    <tr><td style='font-weight:bold'>Total TTC</td><td style='text-align:right; font-weight:bold'>{$total} FCFA</td></tr>
     <tr><td>Déjà payé</td><td style='text-align:right'>{$paid} FCFA</td></tr>
     <tr class='grand-total'><td>RESTE À PAYER</td><td style='text-align:right'>{$remaining} FCFA</td></tr>
   </table>

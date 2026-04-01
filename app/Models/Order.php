@@ -45,7 +45,7 @@ class Order extends Model
     public function customerTabs() { return $this->belongsToMany(CustomerTab::class, 'customer_tab_orders'); }
 
     // Scopes
-    public function scopeOpen($q)   { return $q->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served']); }
+    public function scopeOpen($q)   { return $q->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served']); }
     public function scopeToday($q)  { return $q->whereDate('created_at', today()); }
     public function scopePaid($q)   { return $q->where('status', 'paid'); }
 
@@ -54,7 +54,7 @@ class Order extends Model
     {
         $subtotal = $this->items()
             ->whereNotIn('status', ['cancelled'])
-            ->sum(\DB::raw('unit_price * quantity'));
+            ->sum(DB::raw('unit_price * quantity'));
 
         $vatRate = $this->restaurant->settings['default_vat_rate'] ?? 18;
         $vatAmount = round(($subtotal - $this->discount_amount) * ($vatRate / 100), 2);
@@ -88,5 +88,18 @@ class Order extends Model
             ->whereDate('created_at', today())
             ->count() + 1;
         return "ORD-{$today}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Enregistrer une activité pour cette commande
+     */
+    public function logActivity(string $action, string $message, array $meta = []): OrderLog
+    {
+        return $this->logs()->create([
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
+            'action'  => $action,
+            'message' => $message,
+            'meta'    => $meta,
+        ]);
     }
 }

@@ -43,6 +43,7 @@ class OrderController extends Controller
             ->latest()
             ->firstOrFail();
 
+        /** @var Order $order */
         return response()->json([
             'order'        => $order,
             'amount_paid'  => $order->amountPaid(),
@@ -139,6 +140,8 @@ class OrderController extends Controller
 
     public function sendToKitchen(Request $request, Order $order)
     {
+        /** @var \App\Services\TicketPrintService $ticketService */
+        $ticketService = app(\App\Services\TicketPrintService::class);
         $this->authorizeOrder($request, $order);
 
         $request->validate([
@@ -168,8 +171,24 @@ class OrderController extends Controller
         });
 
         broadcast(new OrderCreated($order->load('items.product', 'table')))->toOthers();
+        
+        // Générer les tickets pour l'impression (Cuisine, Bar, Pizza) - SANS PRIX
+        $tickets = [];
+        $destinations = ['kitchen', 'bar', 'pizza'];
+        foreach ($destinations as $dest) {
+            $html = $ticketService->kitchenTicketHtml($order, $dest);
+            if ($html) {
+                $tickets[] = [
+                    'destination' => $dest,
+                    'html' => $html
+                ];
+            }
+        }
 
-        return response()->json(['message' => 'Commande envoyée en cuisine.']);
+        return response()->json([
+            'message' => 'Commande envoyée en cuisine.',
+            'tickets' => $tickets
+        ]);
     }
 
     public function updateItems(Request $request, Order $order)
@@ -307,6 +326,54 @@ class OrderController extends Controller
         }
 
         return response()->json($order);
+    }
+
+    public function transfer(Request $request, Order $order)
+    {
+        $this->authorizeOrder($request, $order);
+        
+        $request->validate([
+            'target_table_id' => 'required|exists:tables,id',
+        ]);
+
+        $oldTableId = $order->table_id;
+        $targetTableId = $request->target_table_id;
+
+        if ($oldTableId == $targetTableId) {
+            return response()->json(['message' => 'Même table sélectionnée.'], 422);
+        }
+
+        DB::transaction(function () use ($order, $oldTableId, $targetTableId, $request) {
+            // Libérer l'ancienne table si c'était sa seule commande
+            if ($oldTableId) {
+                $otherOrders = Order::where('table_id', $oldTableId)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served'])
+                    ->exists();
+                
+                if (!$otherOrders) {
+                    Table::where('id', $oldTableId)->update([
+                        'status' => 'available',
+                        'occupied_since' => null,
+                        'assigned_user_id' => null
+                    ]);
+                }
+            }
+
+            // Occuper la nouvelle table
+            Table::where('id', $targetTableId)->update([
+                'status' => 'occupied',
+                'occupied_since' => now(),
+                'assigned_user_id' => $request->user()->id
+            ]);
+
+            // Transférer la commande
+            $order->update(['table_id' => $targetTableId]);
+
+            $order->logActivity('order_transferred', "Commande déplacée de Table {$oldTableId} vers Table {$targetTableId}");
+        });
+
+        return response()->json(['message' => 'Commande transférée avec succès.']);
     }
 
     private function authorizeOrder(Request $request, Order $order): void
