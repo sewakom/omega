@@ -43,8 +43,8 @@ class TicketPrintService
         $icon  = $this->routing->destinationIcon($destination);
         
         $locationLabel = '';
-        if ($order->table) {
-            $locationLabel = "TABLE {$order->table->number}";
+        if ($order->table instanceof \App\Models\Table) {
+            $locationLabel = "TABLE " . $order->table->number;
         } else {
             $locationLabel = strtoupper($order->type === 'gozem' ? 'GOZEM' : ($order->type === 'takeaway' ? 'À EMPORTER' : 'VENTE DIRECTE'));
         }
@@ -525,7 +525,8 @@ class TicketPrintService
         
         if ($order->table) {
             $pdf->Cell(30, 4, 'Table', 0, 0);
-            $pdf->Cell(20, 4, $order->table->number, 0, 1, 'R');
+            $tableNum = ($order->table instanceof \App\Models\Table) ? $order->table->number : 'N/A';
+            $pdf->Cell(20, 4, $tableNum, 0, 1, 'R');
         }
         
         $pdf->Cell(30, 4, 'Type', 0, 0);

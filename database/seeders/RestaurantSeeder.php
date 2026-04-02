@@ -11,8 +11,10 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Ingredient;
 use App\Models\Recipe;
+use App\Models\CustomerTab;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 class RestaurantSeeder extends Seeder
@@ -22,35 +24,36 @@ class RestaurantSeeder extends Seeder
         // Désactiver les clés étrangères pour permettre de vider les tables
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
-        // Liste des tables à vider pour repartir à zéro proprement
         $tables = [
             'restaurants', 'roles', 'users', 'floors', 'tables', 
             'categories', 'products', 'ingredients', 'recipes',
             'stock_movements', 'orders', 'order_items', 'payments', 
-            'cash_sessions'
+            'cash_sessions', 'customer_tabs', 'cake_orders', 'expenses'
         ];
 
         foreach ($tables as $table) {
-            DB::table($table)->truncate();
+            if (Schema::hasTable($table)) {
+                DB::table($table)->truncate();
+            }
         }
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // 1. Création du Restaurant principal
-        // On FORCE l'id à 1 pour être sûr que le VITE_RESTAURANT_ID=1 du frontend fonctionne
         $restaurant = Restaurant::create([
-            'id'       => 1, // FORCE L'ID A 1
-            'name'     => 'SmartFlow POS',
-            'slug'     => 'smartflow-pos-demo',
-            'address'  => 'Avenue du 24 Janvier, Lomé, Togo',
+            'id'       => 1,
+            'name'     => 'Ci Gusta ',
+            'slug'     => 'cigusta-omega',
+            'address'  => 'Zone Aéroportuaire, Lomé, Togo',
             'phone'    => '+228 90 00 00 00',
-            'email'    => 'contact@smartflow-pos.tg',
+            'email'    => 'contact@cigusta.tg',
+            'logo'     => 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Ice_cream_icon.svg/512px-Ice_cream_icon.svg.png',
             'currency' => 'XOF',
             'timezone' => 'Africa/Lome',
             'settings' => [
-                'receipt_footer'     => 'Merci de votre visite ! Revenez bientôt.',
-                'receipt_width'      => '80mm',
-                'default_vat_rate'   => 18,
+                'receipt_footer'     => 'Merci pour votre confiance ! Certifié par SmartFlow POS.',
+                'receipt_width'      => '58mm',
+                'default_vat_rate'   => 1,
                 'auto_print_receipt' => true,
                 'currency_symbol'    => 'FCFA',
                 'currency_position'  => 'after',
@@ -64,7 +67,6 @@ class RestaurantSeeder extends Seeder
             ['name' => 'cashier', 'display_name' => 'Caissier',       'permissions' => ['orders.view','payments.create','cash_sessions.*'], 'is_system' => true],
             ['name' => 'waiter',  'display_name' => 'Serveur',        'permissions' => ['orders.create','orders.update','tables.view'], 'is_system' => true],
             ['name' => 'cook',    'display_name' => 'Cuisinier',      'permissions' => ['kitchen.*'], 'is_system' => true],
-            ['name' => 'driver',  'display_name' => 'Livreur',        'permissions' => ['deliveries.update'], 'is_system' => true],
         ];
 
         $createdRoles = [];
@@ -80,11 +82,8 @@ class RestaurantSeeder extends Seeder
 
         // 3. Création des Utilisateurs
         $users = [
-            ['first_name' => 'Super',  'last_name' => 'Admin',   'email' => 'admin@smartflow.tg',   'pin' => '0000', 'role' => 'admin'],
-            ['first_name' => 'Kwame',  'last_name' => 'Manager', 'email' => 'manager@smartflow.tg', 'pin' => '1111', 'role' => 'manager'],
-            ['first_name' => 'Ama',    'last_name' => 'Serveur', 'email' => 'ama@smartflow.tg',     'pin' => '2222', 'role' => 'waiter'],
-            ['first_name' => 'Kofi',   'last_name' => 'Caisse',  'email' => 'kofi@smartflow.tg',    'pin' => '3333', 'role' => 'cashier'],
-            ['first_name' => 'Jean',   'last_name' => 'Cuisine', 'email' => 'jean@smartflow.tg',    'pin' => '4444', 'role' => 'cook'],
+            ['first_name' => 'Super', 'last_name' => 'Admin', 'email' => 'admin@omega.tg',   'pin' => '0000', 'role' => 'admin'],
+            ['first_name' => 'Caisse', 'last_name' => 'Un', 'email' => 'caisse1@omega.tg', 'pin' => '1111', 'role' => 'cashier'],
         ];
 
         foreach ($users as $u) {
@@ -100,93 +99,86 @@ class RestaurantSeeder extends Seeder
             ]);
         }
 
-        // 4. Salle et Tables (Désormais géré séparément via TableSeeder)
-        $this->command->info("L'initialisation des tables se fait désormais avec : php artisan db:seed --class=TableSeeder");
-
-        // 5. Ingrédients (Stock)
-        $ingredientsData = [
-            ['name' => 'Pain Burger', 'unit' => 'unité', 'quantity' => 50, 'min_quantity' => 10, 'cost' => 150],
-            ['name' => 'Steak de Bœuf', 'unit' => 'unité', 'quantity' => 40, 'min_quantity' => 15, 'cost' => 800],
-            ['name' => 'Tomates', 'unit' => 'kg', 'quantity' => 10.5, 'min_quantity' => 2, 'cost' => 500],
-            ['name' => 'Pommes de terre', 'unit' => 'kg', 'quantity' => 25, 'min_quantity' => 5, 'cost' => 400],
-            ['name' => 'Huile de friture', 'unit' => 'L', 'quantity' => 20, 'min_quantity' => 5, 'cost' => 1200],
-            ['name' => 'Sucre', 'unit' => 'kg', 'quantity' => 5, 'min_quantity' => 1, 'cost' => 700],
-            ['name' => 'Poulet entier', 'unit' => 'unité', 'quantity' => 15, 'min_quantity' => 5, 'cost' => 3500],
-            ['name' => 'Riz Long Grain', 'unit' => 'kg', 'quantity' => 100, 'min_quantity' => 20, 'cost' => 650],
-        ];
-
-        $ingredients = [];
-        foreach ($ingredientsData as $ing) {
-            $ingredients[$ing['name']] = Ingredient::create([
-                'restaurant_id' => $restaurant->id,
-                'name'          => $ing['name'],
-                'unit'          => $ing['unit'],
-                'quantity'      => $ing['quantity'],
-                'min_quantity'  => $ing['min_quantity'],
-                'cost_per_unit' => $ing['cost'],
-                'category'      => 'Général',
+        // 4. Salle et Tables (Grille 10x10)
+        $floor = Floor::create(['restaurant_id' => $restaurant->id, 'name' => 'Salle principale', 'order' => 1]);
+        for ($i = 1; $i <= 100; $i++) {
+            Table::create([
+                'floor_id'   => $floor->id,
+                'number'     => (string) $i,
+                'capacity'   => ($i % 4 === 0) ? 6 : 4,
+                'position_x' => (($i - 1) % 10) * 140 + 50,
+                'position_y' => floor(($i - 1) / 10) * 120 + 50,
+                'shape'      => ($i % 10 === 0) ? 'round' : 'rectangle',
+                'active'     => true,
             ]);
         }
 
-        // 6. Catégories et Produits
-        $categoriesData = [
-            'Burgers' => [
-                ['name' => 'Cheeseburger King', 'price' => 3500, 'ingredients' => [
-                    ['name' => 'Pain Burger', 'qty' => 1],
-                    ['name' => 'Steak de Bœuf', 'qty' => 1],
-                    ['name' => 'Tomates', 'qty' => 0.05],
-                ]],
-                ['name' => 'Double Steak Burger', 'price' => 5000, 'ingredients' => [
-                    ['name' => 'Pain Burger', 'qty' => 1],
-                    ['name' => 'Steak de Bœuf', 'qty' => 2],
-                ]],
+        // 5. Catégories avec Destinations (Crucial pour le routage)
+        $categories = [
+            ['name' => 'Pizzas 🍕',   'dest' => 'pizza',   'color' => '#E53935'],
+            ['name' => 'Burgers 🍔',  'dest' => 'kitchen', 'color' => '#FF9800'],
+            ['name' => 'Plats 🍲',    'dest' => 'kitchen', 'color' => '#4CAF50'],
+            ['name' => 'Boissons 🥤', 'dest' => 'bar',     'color' => '#2196F3'],
+            ['name' => 'Desserts 🍦', 'dest' => 'kitchen', 'color' => '#9C27B0'],
+        ];
+
+        $createdCats = [];
+        foreach ($categories as $i => $cat) {
+            $createdCats[$cat['name']] = Category::create([
+                'restaurant_id' => $restaurant->id,
+                'name'          => $cat['name'],
+                'destination'   => $cat['dest'],
+                'color'         => $cat['color'],
+                'order'         => $i,
+                'active'        => true
+            ]);
+        }
+
+        // 6. Produits avec Emojis
+        $productsData = [
+            'Pizzas 🍕' => [
+                ['name' => 'Margherita', 'price' => 4500, 'emoji' => '🍕'],
+                ['name' => 'Regina',     'price' => 6000, 'emoji' => '🍕'],
+                ['name' => 'Calzone',    'price' => 6500, 'emoji' => '🥟'],
             ],
-            'Plats Locaux' => [
-                ['name' => 'Poulet Braisé + Frites', 'price' => 4500, 'ingredients' => [
-                    ['name' => 'Poulet entier', 'qty' => 0.25],
-                    ['name' => 'Pommes de terre', 'qty' => 0.3],
-                    ['name' => 'Huile de friture', 'qty' => 0.1],
-                ]],
-                ['name' => 'Riz Sauce Arachide', 'price' => 2500, 'ingredients' => [
-                    ['name' => 'Riz Long Grain', 'qty' => 0.2],
-                ]],
+            'Burgers 🍔' => [
+                ['name' => 'Cheese Burger', 'price' => 3500, 'emoji' => '🍔'],
+                ['name' => 'Double Bacon',  'price' => 5500, 'emoji' => '🥓'],
             ],
-            'Boissons' => [
-                ['name' => 'Coca Cola 33cl', 'price' => 800, 'direct_stock' => 24],
-                ['name' => 'Eau Minérale 50cl', 'price' => 500, 'direct_stock' => 48],
-                ['name' => 'Jus d\'Orange Frais', 'price' => 1500, 'ingredients' => [
-                    ['name' => 'Sucre', 'qty' => 0.01],
-                ]],
+            'Boissons 🥤' => [
+                ['name' => 'Coca Cola',   'price' => 800,  'emoji' => '🥤'],
+                ['name' => 'Eau Minérale','price' => 500,  'emoji' => '💧'],
+                ['name' => 'Bière Togocel','price' => 1200, 'emoji' => '🍺'],
             ],
         ];
 
-        foreach ($categoriesData as $catName => $products) {
-            $category = Category::create(['restaurant_id' => $restaurant->id, 'name' => $catName]);
-            foreach ($products as $pData) {
-                $product = Product::create([
+        foreach ($productsData as $catName => $prods) {
+            foreach ($prods as $p) {
+                Product::create([
                     'restaurant_id' => $restaurant->id,
-                    'category_id'   => $category->id,
-                    'name'          => $pData['name'],
-                    'price'         => $pData['price'],
-                    'track_stock'   => isset($pData['direct_stock']) || isset($pData['ingredients']),
-                    'quantity'      => $pData['direct_stock'] ?? 0,
-                    'min_quantity'  => isset($pData['direct_stock']) ? 6 : 0,
+                    'category_id'   => $createdCats[$catName]->id,
+                    'name'          => $p['name'],
+                    'price'         => $p['price'],
+                    'emoji'         => $p['emoji'],
+                    'available'     => true,
+                    'active'        => true
                 ]);
-
-                // Création de la recette
-                if (isset($pData['ingredients'])) {
-                    foreach ($pData['ingredients'] as $recipeItem) {
-                        Recipe::create([
-                            'product_id'    => $product->id,
-                            'ingredient_id' => $ingredients[$recipeItem['name']]->id,
-                            'quantity'      => $recipeItem['qty'],
-                        ]);
-                    }
-                }
             }
         }
 
-        $this->command->info("✅ SYSTÈME COMPLET INITIALISÉ FORCÉ AVEC ID 1 !");
-        $this->command->info("🔑 Mdp: password | PIN Admin: 0000");
+        // 7. Clients pour les Ardoises (Tabs)
+        $tabs = ['Directeur General', 'Commandant Koffi', 'Entreprise Delta'];
+        foreach ($tabs as $name) {
+            CustomerTab::create([
+                'restaurant_id' => $restaurant->id,
+                'name'          => $name,
+                'phone'         => '90000000',
+                'balance'       => 0,
+                'limit'         => 500000,
+                'status'        => 'open'
+            ]);
+        }
+
+        $this->command->info("✅ SYSTÈME OMEGA POS COMPLET INITIALISÉ !");
     }
 }
