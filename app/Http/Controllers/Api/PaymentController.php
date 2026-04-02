@@ -31,7 +31,7 @@ class PaymentController extends Controller
         $session = CashSession::where('restaurant_id', $request->user()->restaurant_id)
             ->whereNull('closed_at')->latest()->first();
 
-        abort_if(!$session && $request->input('method') === 'cash', 422, 'Aucune session de caisse ouverte.');
+        abort_if(!$session, 422, 'Aucune session de caisse ouverte. Veuillez ouvrir une session de caisse avant d\'encaisser.');
 
         DB::transaction(function () use ($request, $order, $session) {
             $changeGiven = null;

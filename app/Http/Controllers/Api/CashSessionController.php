@@ -26,12 +26,19 @@ class CashSessionController extends Controller
         if (!$session) return response()->json(null);
 
         $totals = $this->computeTotals($session);
+        $expensesTotal = Expense::where('cash_session_id', $session->id)->sum('amount');
+
+        // On injecte les valeurs dynamiques dont le frontend a besoin
+        $session->total_sales = $totals['grand_total'];
+        $session->expected_amount = (float)$session->opening_amount + (float)$totals['cash'] - (float)$expensesTotal;
+        $session->total_expenses = (float)$expensesTotal;
 
         return response()->json([
-            'session'       => $session,
-            'totals'        => $totals,
-            'orders_count'  => Payment::where('cash_session_id', $session->id)->distinct('order_id')->count(),
-            'expenses_total'=> Expense::where('cash_session_id', $session->id)->sum('amount'),
+            'session'            => $session,
+            'payments_by_method' => $totals,
+            'totals'             => $totals,
+            'orders_count'       => Payment::where('cash_session_id', $session->id)->distinct('order_id')->count(),
+            'expenses_total'     => $expensesTotal,
         ]);
     }
 
