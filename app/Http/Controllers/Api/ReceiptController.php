@@ -140,19 +140,27 @@ class ReceiptController extends Controller
     {
         $type = $request->get('type', 'receipt');
 
+        // On charge la commande AVEC son restaurant par défaut pour être indépendant de l'auth
+        $order = Order::with(['items.product', 'items.modifiers.modifier', 'payments', 'table', 'restaurant'])
+            ->findOrFail($orderId);
+
         if ($type === 'invoice') {
-            return $this->invoiceA4($request, $orderId);
+            return $this->invoiceA4HtmlDirect($order);
         }
 
         // Pour type=receipt: on génère le ticket thermique en HTML direct
-        $order = Order::with(['items.product', 'items.modifiers.modifier', 'payments', 'table'])
-            ->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
-
-        $restaurant = $request->user()->restaurant;
+        $restaurant = $order->restaurant;
         $config = $restaurant->settings ?? [];
         $receipt = $this->buildReceipt($order, $restaurant, $config);
 
         $html = view('receipts.ticket', compact('receipt', 'restaurant', 'config'))->render();
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
+    /** Helper pour renvoyer le HTML A4 direct sans refaire le findOrFail */
+    private function invoiceA4HtmlDirect(Order $order)
+    {
+        $html = $this->ticketService->invoiceA4Html($order);
         return response($html)->header('Content-Type', 'text/html');
     }
 
