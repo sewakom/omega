@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\CashSession;
 use App\Services\OrderRoutingService;
+use App\Libraries\Fpdf;
 
 /**
  * TicketPrintService
@@ -330,5 +331,184 @@ class TicketPrintService
   </div>
 </body>
 </html>";
+    }
+
+    /**
+
+     * Génère la facture A4 en PDF via FPDF
+     */
+    public function generateInvoiceA4Pdf(Order $order): string
+    {
+        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter']);
+        $restaurant = $order->restaurant;
+        $items      = $order->items->whereNotIn('status', ['cancelled']);
+
+        $pdf = new Fpdf('P', 'mm', 'A4');
+        $pdf->SetMargins(15, 15, 15);
+        $pdf->AddPage();
+        
+        // Header
+        $pdf->SetFont('Helvetica', 'B', 20);
+        $pdf->Cell(100, 10, utf8_decode(strtoupper($restaurant->name)), 0, 0);
+        
+        $pdf->SetFont('Helvetica', 'B', 16);
+        $pdf->SetTextColor(50, 50, 100);
+        $pdf->Cell(80, 10, 'FACTURE', 0, 1, 'R');
+        $pdf->SetTextColor(0, 0, 0);
+
+        // Subheader Info
+        $pdf->SetFont('Helvetica', '', 10);
+        $pdf->Cell(100, 5, utf8_decode($restaurant->address ?? ''), 0, 0);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(80, 5, 'N' . utf8_decode('°') . ' INV-' . $order->order_number, 0, 1, 'R');
+        
+        $pdf->SetFont('Helvetica', '', 10);
+        $pdf->Cell(100, 5, 'T' . utf8_decode('é') . 'l: ' . $restaurant->phone, 0, 0);
+        $pdf->Cell(80, 5, 'Date: ' . now()->format('d/m/Y H:i'), 0, 1, 'R');
+
+        $pdf->Ln(10);
+
+        // Customer Block
+        if ($order->customer_name) {
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->SetFont('Helvetica', 'B', 11);
+            $pdf->Cell(0, 10, ' CLIENT : ' . utf8_decode(strtoupper($order->customer_name)) . ' | ' . $order->customer_phone, 0, 1, 'L', true);
+            $pdf->Ln(5);
+        }
+
+        // Table Header
+        $pdf->SetFillColor(26, 26, 46);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(10, 10, '#', 0, 0, 'C', true);
+        $pdf->Cell(100, 10, 'Article / Description', 0, 0, 'L', true);
+        $pdf->Cell(20, 10, utf8_decode('Qté'), 0, 0, 'C', true);
+        $pdf->Cell(25, 10, 'P.U.', 0, 0, 'R', true);
+        $pdf->Cell(25, 10, 'Total', 0, 1, 'R', true);
+
+        // Table Body
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->SetFont('Helvetica', '', 10);
+        $i = 1;
+        foreach ($items as $item) {
+            $subtotal = $item->quantity * $item->unit_price;
+            $pdf->Cell(10, 8, $i++, 'B', 0, 'C');
+            $pdf->Cell(100, 8, utf8_decode($item->product->name), 'B', 0, 'L');
+            $pdf->Cell(20, 8, $item->quantity, 'B', 0, 'C');
+            $pdf->Cell(25, 8, number_format($item->unit_price, 0, '.', ' '), 'B', 0, 'R');
+            $pdf->Cell(25, 8, number_format($subtotal, 0, '.', ' '), 'B', 1, 'R');
+        }
+
+        $pdf->Ln(5);
+
+        // Totals
+        $pdf->SetX(120);
+        $pdf->SetFont('Helvetica', '', 11);
+        $pdf->Cell(40, 8, 'Sous-total', 0, 0, 'L');
+        $pdf->Cell(30, 8, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        
+        if ($order->discount_amount > 0) {
+            $pdf->SetX(120);
+            $pdf->Cell(40, 8, 'Remise', 0, 0, 'L');
+            $pdf->Cell(30, 8, '-' . number_format((float) $order->discount_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        }
+
+        $pdf->SetX(120);
+        $pdf->Cell(40, 8, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
+        $pdf->Cell(30, 8, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+
+        $pdf->SetX(120);
+        $pdf->SetFont('Helvetica', 'B', 13);
+        $pdf->SetFillColor(240, 240, 240);
+        $pdf->Cell(40, 10, 'TOTAL', 0, 0, 'L', true);
+        $pdf->Cell(30, 10, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 0, 1, 'R', true);
+
+        // Payments
+        $pdf->Ln(10);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(0, 6, utf8_decode('DÉTAILS PAIEMENT'), 'B', 1, 'L');
+        $pdf->SetFont('Helvetica', '', 10);
+        foreach ($order->payments as $pmt) {
+            $pdf->Cell(50, 6, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
+            $pdf->Cell(50, 6, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
+        }
+
+        // Footer
+        $pdf->SetY(-30);
+        $pdf->SetFont('Helvetica', 'I', 10);
+        $pdf->Cell(0, 10, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance'), 0, 1, 'C');
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(0, 5, utf8_decode($restaurant->name . ' — Document certifié par Omega POS'), 0, 1, 'C');
+
+        return $pdf->Output('S');
+    }
+
+    /**
+     * Génère le reçu client en PDF (format ticket thermique 58mm-ish)
+     */
+    public function generateReceiptPdf(Order $order): string
+    {
+        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter']);
+        $restaurant = $order->restaurant;
+        $items      = $order->items->whereNotIn('status', ['cancelled']);
+
+        // Format thermal 58mm: Largeur approx 58mm = 58pts * k? No, in mm.
+        // On utilise un format personnalisé
+        $pdf = new Fpdf('P', 'mm', array(58, 150 + ($items->count() * 10)));
+        $pdf->SetMargins(2, 2, 2);
+        $pdf->AddPage();
+        
+        $pdf->SetFont('Helvetica', 'B', 12);
+        $pdf->Cell(0, 6, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
+        
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(0, 4, utf8_decode($restaurant->address ?? ''), 0, 1, 'C');
+        $pdf->Cell(0, 4, 'T' . utf8_decode('é') . 'l: ' . $restaurant->phone, 0, 1, 'C');
+        
+        $pdf->Ln(2);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $tableNum = $order->table ? 'TABLE ' . $order->table->number : strtoupper($order->type);
+        $pdf->Cell(0, 6, $tableNum, 1, 1, 'C');
+        
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(0, 4, 'Ticket #' . $order->order_number, 0, 1);
+        $pdf->Cell(0, 4, 'Date: ' . now()->format('d/m/Y H:i'), 0, 1);
+        
+        $pdf->Ln(2);
+        $pdf->Cell(0, 0, '', 'T', 1);
+        
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->Cell(35, 5, 'ITEM', 0, 0);
+        $pdf->Cell(19, 5, 'TOTAL', 0, 1, 'R');
+        $pdf->SetFont('Helvetica', '', 8);
+        
+        foreach ($items as $item) {
+            $pdf->Cell(35, 4, utf8_decode($item->quantity . 'x ' . substr($item->product->name, 0, 20)), 0, 0);
+            $subtotal = $item->quantity * $item->unit_price;
+            $pdf->Cell(19, 4, number_format($subtotal, 0, '.', ' '), 0, 1, 'R');
+        }
+        
+        $pdf->Cell(0, 0, '', 'T', 1);
+        $pdf->Ln(2);
+        
+        $pdf->Cell(30, 4, 'Sous-total', 0, 0);
+        $pdf->Cell(19, 4, number_format((float) $order->subtotal, 0, '.', ' '), 0, 1, 'R');
+        
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(35, 6, 'TOTAL', 0, 0);
+        $pdf->Cell(19, 6, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        
+        $pdf->Ln(2);
+        $pdf->SetFont('Helvetica', '', 8);
+        foreach ($order->payments as $pmt) {
+            $pdf->Cell(35, 4, utf8_decode(strtoupper($pmt->method)), 0, 0);
+            $pdf->Cell(19, 4, number_format($pmt->amount, 0, '.', ' '), 0, 1, 'R');
+        }
+        
+        $pdf->Ln(4);
+        $pdf->SetFont('Helvetica', 'I', 8);
+        $pdf->MultiCell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci de votre visite !'), 0, 'C');
+
+        return $pdf->Output('S');
     }
 }

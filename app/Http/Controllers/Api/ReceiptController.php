@@ -145,23 +145,25 @@ class ReceiptController extends Controller
             ->findOrFail($orderId);
 
         if ($type === 'invoice') {
-            return $this->invoiceA4HtmlDirect($order);
+            return $this->invoiceA4PdfDirect($order);
         }
 
-        // Pour type=receipt: on génère le ticket thermique en HTML direct
-        $restaurant = $order->restaurant;
-        $config = $restaurant->settings ?? [];
-        $receipt = $this->buildReceipt($order, $restaurant, $config);
-
-        $html = view('receipts.ticket', compact('receipt', 'restaurant', 'config'))->render();
-        return response($html)->header('Content-Type', 'text/html');
+        // Pour type=receipt: on génère le ticket thermique en PDF via FPDF
+        $pdfContent = $this->ticketService->generateReceiptPdf($order);
+        
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="receipt-' . $order->order_number . '.pdf"');
     }
 
-    /** Helper pour renvoyer le HTML A4 direct sans refaire le findOrFail */
-    private function invoiceA4HtmlDirect(Order $order)
+    /** Helper pour renvoyer le PDF A4 direct */
+    private function invoiceA4PdfDirect(Order $order)
     {
-        $html = $this->ticketService->invoiceA4Html($order);
-        return response($html)->header('Content-Type', 'text/html');
+        $pdfContent = $this->ticketService->generateInvoiceA4Pdf($order);
+        
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="invoice-' . $order->order_number . '.pdf"');
     }
 
     private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', default => 'Autre' }; }
