@@ -25,9 +25,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('change-password', [Api\Auth\AuthController::class, 'changePassword']);
     });
 
-    // Utilisateurs
+    // Utilisateurs & Rôles
     Route::apiResource('users', Api\UserController::class);
     Route::patch('users/{user}/toggle-active', [Api\UserController::class, 'toggleActive']);
+    Route::get('roles', [Api\RoleController::class, 'index']);
 
     // Salles
     Route::apiResource('floors', Api\FloorController::class);
