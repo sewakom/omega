@@ -47,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Commandes
     Route::apiResource('orders', Api\OrderController::class)->except(['destroy']);
+    Route::get('orders/{order}/ticket',               [Api\ReceiptController::class, 'ticket']);
     Route::get('orders/table/{tableId}/current',      [Api\OrderController::class, 'currentByTable']);
     Route::put('orders/{order}/items',                [Api\OrderController::class, 'updateItems']);
     Route::post('orders/{order}/add-items',           [Api\OrderController::class, 'addItems']);

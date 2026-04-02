@@ -132,6 +132,30 @@ class ReceiptController extends Controller
         return response($html)->header('Content-Type', 'text/html');
     }
 
+    /**
+     * Interface polyvalente pour le frontend
+     * GET /api/orders/{id}/ticket?type=receipt|invoice
+     */
+    public function ticket(Request $request, int $orderId)
+    {
+        $type = $request->get('type', 'receipt');
+
+        if ($type === 'invoice') {
+            return $this->invoiceA4($request, $orderId);
+        }
+
+        // Pour type=receipt: on génère le ticket thermique en HTML direct
+        $order = Order::with(['items.product', 'items.modifiers.modifier', 'payments', 'table'])
+            ->where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+
+        $restaurant = $request->user()->restaurant;
+        $config = $restaurant->settings ?? [];
+        $receipt = $this->buildReceipt($order, $restaurant, $config);
+
+        $html = view('receipts.ticket', compact('receipt', 'restaurant', 'config'))->render();
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
     private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', default => 'Autre' }; }
     private function typeLabel(string $type): string { return match($type) { 'dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'gozem' => 'Gozem', 'delivery' => 'Livraison', default => $type }; }
 }
