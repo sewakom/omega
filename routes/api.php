@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('floors/{floor}/tables/{table}', [Api\FloorController::class, 'removeTable']);
 
     // Tables
+    Route::get('tables',                   [Api\TableController::class, 'allTables']);
     Route::put('tables/{table}/status',    [Api\TableController::class, 'updateStatus']);
     Route::put('tables/{table}/layout',    [Api\TableController::class, 'updateLayout']);
     Route::put('tables/{table}/assign',    [Api\TableController::class, 'assign']);
@@ -87,7 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ------------------------------------------------
     // ARDOISES CLIENTS (Consommation Différée)
     // ------------------------------------------------
-    Route::prefix('tabs')->group(function () {
+    Route::prefix('customer-tabs')->group(function () {
         Route::get('/',                           [Api\CustomerTabController::class, 'index']);
         Route::post('/',                          [Api\CustomerTabController::class, 'store']);
         Route::get('/{tab}',                      [Api\CustomerTabController::class, 'show']);

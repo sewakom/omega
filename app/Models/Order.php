@@ -18,13 +18,14 @@ class Order extends Model
         'order_number', 'type', 'status', 'covers',
         'customer_name', 'customer_phone',
         'subtotal', 'discount_amount', 'discount_reason',
-        'vat_amount', 'total', 'notes',
+        'vat_rate', 'vat_amount', 'total', 'notes',
         'sent_to_kitchen_at', 'served_at', 'paid_at',
     ];
 
     protected $casts = [
         'subtotal'        => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'vat_rate'        => 'decimal:2',
         'vat_amount'      => 'decimal:2',
         'total'           => 'decimal:2',
         'sent_to_kitchen_at' => 'datetime',
@@ -56,15 +57,17 @@ class Order extends Model
             ->whereNotIn('status', ['cancelled'])
             ->sum(DB::raw('unit_price * quantity'));
 
-        $vatRate = $this->restaurant->settings['default_vat_rate'] ?? 18;
-        $vatAmount = round(($subtotal - $this->discount_amount) * ($vatRate / 100), 2);
+        $vatRate = $this->vat_rate ?: ($this->restaurant->settings['default_vat_rate'] ?? 18);
         
-        $total     = $subtotal - $this->discount_amount + $vatAmount;
-
+        // Formule TVA appliquée (HT -> TTC) : TVA = HT * taux/100
+        $subAfterDisc = (float) $subtotal - (float) $this->discount_amount;
+        $vatAmount    = (float) round($subAfterDisc * ($vatRate / 100), 2);
+        
         $this->update([
             'subtotal'   => $subtotal,
+            'vat_rate'   => $vatRate,
             'vat_amount' => $vatAmount,
-            'total'      => max(0, $total),
+            'total'      => max(0, $subAfterDisc + $vatAmount),
         ]);
     }
 

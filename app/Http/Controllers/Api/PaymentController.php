@@ -51,12 +51,13 @@ class PaymentController extends Controller
                 'is_partial'      => $request->amount < $order->amountDue(),
             ]);
 
-            $amountPaid = $order->payments()->sum('amount');
-            if ($amountPaid >= $order->total) {
+            $amountPaid = (float) $order->payments()->sum('amount');
+            // Ajout d'une tolérance de rounding (1 unité de devise) pour marquer comme payé
+            if ($amountPaid >= ($order->total - 1)) {
                 $order->update(['status' => 'paid', 'paid_at' => now(), 'cashier_id' => Auth::id()]);
 
                 if ($order->table_id) {
-                    $order->table->update([
+                    \App\Models\Table::where('id', $order->table_id)->update([
                         'status'           => 'free',
                         'occupied_since'   => null,
                         'assigned_user_id' => null,

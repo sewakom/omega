@@ -11,6 +11,17 @@ use Illuminate\Support\Facades\DB;
 
 class TableController extends Controller
 {
+    public function allTables(Request $request)
+    {
+        $tables = Table::whereHas('floor', function($q) use ($request) {
+            $q->where('restaurant_id', $request->user()->restaurant_id);
+        })
+        ->where('active', true)
+        ->get();
+
+        return response()->json($tables);
+    }
+
     public function index(Request $request, Floor $floor)
     {
         $this->authorizeFloor($request, $floor);
