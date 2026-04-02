@@ -167,18 +167,26 @@ class RestaurantSeeder extends Seeder
         }
 
         // 7. Clients pour les Ardoises (Tabs)
-        $tabs = ['Directeur General', 'Commandant Koffi', 'Entreprise Delta'];
-        foreach ($tabs as $name) {
+        // 7. Clients pour les Ardoises (Tabs)
+        $tabs = [
+            ['fname' => 'Directeur', 'lname' => 'Général', 'phone' => '90000000'],
+            ['fname' => 'Commandant', 'lname' => 'Koffi', 'phone' => '91000000'],
+            ['fname' => 'Delta', 'lname' => 'SARL', 'phone' => '92000000'],
+        ];
+
+        foreach ($tabs as $t) {
             CustomerTab::create([
                 'restaurant_id' => $restaurant->id,
-                'name'          => $name,
-                'phone'         => '90000000',
-                'balance'       => 0,
-                'limit'         => 500000,
+                'created_by'    => 1, // Admin par défaut
+                'first_name'    => $t['fname'],
+                'last_name'     => $t['lname'],
+                'phone'         => $t['phone'],
+                'total_amount'  => 0,
+                'paid_amount'   => 0,
                 'status'        => 'open'
             ]);
         }
 
-        $this->command->info("✅ SYSTÈME OMEGA POS COMPLET INITIALISÉ !");
+        $this->command->info("✅ SYSTÈME SmartFlow POS COMPLET INITIALISÉ !");
     }
 }
