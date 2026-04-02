@@ -148,7 +148,7 @@ class RestaurantSeeder extends Seeder
             'Boissons 🥤' => [
                 ['name' => 'Coca Cola',   'price' => 800,  'emoji' => '🥤'],
                 ['name' => 'Eau Minérale','price' => 500,  'emoji' => '💧'],
-                ['name' => 'Bière Togocel','price' => 1200, 'emoji' => '🍺'],
+                ['name' => 'Bière Togocel oui ou','price' => 1200, 'emoji' => '🍺'],
             ],
         ];
 
