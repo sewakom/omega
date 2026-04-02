@@ -155,97 +155,11 @@ class CustomerTabController extends Controller
     {
         abort_if($tab->restaurant_id !== $request->user()->restaurant_id, 403);
 
-        $tab->load(['orders.items.product', 'orders.table', 'restaurant']);
-        $restaurant = $tab->restaurant;
-        $orders     = $tab->orders;
-
-        $totalVat = 0;
-        $subtotalNoVat = 0;
-
-        $allItemsHtml = '';
-        $i = 1;
-        foreach ($orders as $order) {
-            $totalVat += (float) $order->vat_amount;
-            $subtotalNoVat += (float) $order->subtotal;
-            foreach ($order->items->whereNotIn('status', ['cancelled']) as $item) {
-                $price    = number_format($item->unit_price, 0, ',', ' ');
-                $subtotal = number_format($item->quantity * $item->unit_price, 0, ',', ' ');
-                $tableRef = $order->table ? "Table {$order->table->number}" : ucfirst($order->type);
-                $allItemsHtml .= "
-                <tr>
-                    <td>{$i}</td>
-                    <td>{$item->product->name}</td>
-                    <td style='text-align:center'>{$item->quantity}</td>
-                    <td style='text-align:right'>{$price}</td>
-                    <td style='text-align:right'>{$subtotal}</td>
-                    <td style='font-size:10px;color:#666'>{$tableRef}</td>
-                </tr>";
-                $i++;
-            }
-        }
-
-        $total       = number_format((float) $tab->total_amount, 0, ',', ' ');
-        $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
-        $vatAmt      = number_format((float) $totalVat, 0, ',', ' ');
-        $paid        = number_format((float) $tab->paid_amount, 0, ',', ' ');
-        $remaining   = number_format((float) $tab->remainingAmount(), 0, ',', ' ');
-        $date        = now()->format('d/m/Y');
-        $restoAddr   = $restaurant->address ?? '';
-
-        $html = "<!DOCTYPE html>
-<html>
-<head>
-<meta charset='UTF-8'>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 15mm; }
-  h1 { font-size: 22px; color: #1a1a2e; }
-  h2 { font-size: 14px; color: #16213e; margin: 16px 0 8px; border-bottom: 2px solid #1a1a2e; padding-bottom: 4px; }
-  .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-  .client-bloc { background:#f5f5f5; padding:10px 14px; border-radius:4px; margin-bottom:14px; }
-  table { width:100%; border-collapse:collapse; }
-  th { background:#1a1a2e; color:white; padding:8px; text-align:left; }
-  td { padding:6px 8px; border-bottom:1px solid #eee; }
-  .total-bloc { width:40%; margin-left:60%; margin-top:12px; }
-  .total-bloc td { border:none; padding:4px 8px; }
-  .grand-total td { font-weight:bold; font-size:14px; border-top:2px solid #1a1a2e; }
-  .footer { margin-top:30px; text-align:center; font-size:10px; color:#999; }
-  @media print { @page { size:A4; margin:15mm; } }
-</style>
-</head>
-<body>
-  <div class='header'>
-    <div>
-      <h1>{$restaurant->name}</h1>
-      <div>{$restoAddr}</div>
-    </div>
-    <div style='text-align:right'>
-      <strong>FACTURE ARDOISE</strong><br>
-      Date: {$date}
-    </div>
-  </div>
-  <div class='client-bloc'>
-    <strong>Client:</strong> {$tab->full_name} &nbsp;|&nbsp;
-    <strong>Tél:</strong> {$tab->phone}
-  </div>
-  <h2>Détail des consommations</h2>
-  <table>
-    <thead>
-      <tr><th>#</th><th>Article</th><th>Qté</th><th>P.U. FCFA</th><th>Total FCFA</th><th>Réf.</th></tr>
-    </thead>
-    <tbody>{$allItemsHtml}</tbody>
-  </table>
-  <table class='total-bloc'>
-    <tr><td>Total HT</td><td style='text-align:right'>{$total} FCFA</td></tr>
-    <tr><td>TVA ({$vatRate}%)</td><td style='text-align:right'>{$vatAmt} FCFA</td></tr>
-    <tr><td style='font-weight:bold'>Total TTC</td><td style='text-align:right; font-weight:bold'>{$total} FCFA</td></tr>
-    <tr><td>Déjà payé</td><td style='text-align:right'>{$paid} FCFA</td></tr>
-    <tr class='grand-total'><td>RESTE À PAYER</td><td style='text-align:right'>{$remaining} FCFA</td></tr>
-  </table>
-  <div class='footer'>Facture générée le {$date} — {$restaurant->name}</div>
-</body>
-</html>";
-
-        return response($html)->header('Content-Type', 'text/html');
+        $pdfBinary = $this->ticketService->generateTabInvoicePdf($tab);
+        
+        return response($pdfBinary)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="ardoise_' . $tab->id . '.pdf"');
     }
 
     /** Annuler une ardoise */

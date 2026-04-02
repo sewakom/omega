@@ -52,6 +52,7 @@ class CakeOrderController extends Controller
         $order = CakeOrder::create([
             'restaurant_id'   => $request->user()->restaurant_id,
             'user_id'         => $request->user()->id,
+            'cash_session_id' => $this->getActiveSession($request->user()->restaurant_id)?->id,
             'order_number'    => CakeOrder::generateNumber($request->user()->restaurant_id),
             'customer_name'   => $request->customer_name,
             'customer_phone'  => $request->customer_phone,
@@ -114,6 +115,7 @@ class CakeOrderController extends Controller
                 'advance_paid'      => $totalPaid,
                 'remaining_amount'  => 0,
                 'status'            => 'collected',
+                'cash_session_id'   => $this->getActiveSession($cakeOrder->restaurant_id)?->id,
             ]);
         });
 
@@ -177,7 +179,7 @@ class CakeOrderController extends Controller
   <div style='display:flex;justify-content:space-between'><span>TOTAL</span><span>{$total} FCFA</span></div>
   <div style='display:flex;justify-content:space-between'><span>Acompte</span><span>{$advance} FCFA</span></div>
   <div style='display:flex;justify-content:space-between;font-weight:bold'><span>RESTE</span><span>{$remaining} FCFA</span></div>
-  <div class='footer'>Merci pour votre commande !</div>
+  <div class='footer'>Merci pour votre commande !<br>Certifié par Omega POS</div>
 </body>
 </html>";
 

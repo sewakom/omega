@@ -35,9 +35,17 @@ class DailyReportService
         $ordersCount  = $orders->count();
         $totalRevenue = $orders->sum('total');
 
-        // Dépenses
+        // Dépenses de la session
         $expenses = Expense::where('cash_session_id', $session->id)->get();
         $totalExpenses = $expenses->sum('amount');
+
+        // Commandes Gâteaux (Acomptes encaissés durant cette session)
+        $cakePayments = \App\Models\CakeOrder::where('cash_session_id', $session->id)->get();
+        $totalCakes = $cakePayments->sum(function($c) use ($session) {
+            // Si la commande a été créée ET payée dans la même session, on prend 'advance_paid' (qui est le total)
+            // C'est un peu approximatif sans table de paiement séparée, mais ça donne une idée.
+            return $c->advance_paid;
+        });
 
         // Par type de commande
         $byType = $orders->groupBy('type')->map(fn($g) => [
@@ -66,9 +74,9 @@ class DailyReportService
             $typeHtml .= "<tr><td>{$label}</td><td>{$data['count']}</td><td style='text-align:right'>{$total} FCFA</td></tr>";
         }
 
-        $totalRevenueF  = number_format($totalRevenue, 0, ',', ' ');
+        $totalRevenueF  = number_format($totalRevenue + $totalCakes, 0, ',', ' ');
         $totalExpensesF = number_format($totalExpenses, 0, ',', ' ');
-        $netF           = number_format($totalRevenue - $totalExpenses, 0, ',', ' ');
+        $netF           = number_format(($totalRevenue + $totalCakes) - $totalExpenses, 0, ',', ' ');
         $openAmount     = number_format($session->opening_amount, 0, ',', ' ');
         $closeAmount    = number_format($session->closing_amount ?? 0, 0, ',', ' ');
         $expectedF      = number_format($session->expected_amount ?? 0, 0, ',', ' ');

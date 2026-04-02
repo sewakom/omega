@@ -117,21 +117,27 @@ class ProductController extends Controller
             'quantity'    => 'sometimes|numeric|min:0',
             'min_quantity'=> 'sometimes|numeric|min:0',
             'category_id' => 'sometimes|exists:categories,id',
+            'image'       => 'nullable|sometimes|image|max:2048',
         ]);
+
+        $data = $request->only([
+            'name', 'description', 'price', 'cost_price', 'vat_rate',
+            'category_id', 'order', 'emoji'
+        ]);
+
+        if ($request->has('available'))   $data['available'] = $request->boolean('available');
+        if ($request->has('track_stock')) $data['track_stock'] = $request->boolean('track_stock');
 
         if ($request->hasFile('image')) {
             if ($product->image) Storage::disk('public')->delete($product->image);
-            $request->merge(['image' => $request->file('image')->store(
+            $data['image'] = $request->file('image')->store(
                 "restaurants/{$product->restaurant_id}/products", 'public'
-            )]);
+            );
         }
 
-        $product->update($request->only([
-            'name', 'description', 'price', 'cost_price', 'vat_rate',
-            'category_id', 'available', 'track_stock', 'image', 'order', 'emoji'
-        ]));
+        $product->update($data);
 
-        return response()->json($product->fresh('modifierGroups.modifiers'));
+        return response()->json($product->load('category', 'modifierGroups.modifiers'));
     }
 
     public function toggleAvailable(Product $product, Request $request)
