@@ -20,7 +20,7 @@ class CategoryController extends Controller
     public function flat(Request $request)
     {
         $categories = Category::where('restaurant_id', $request->user()->restaurant_id)
-            ->where('active', true)->orderBy('name')->get(['id', 'name', 'parent_id']);
+            ->where('active', true)->orderBy('name')->get(['id', 'name', 'parent_id', 'destination', 'color']);
         return response()->json($categories);
     }
 
@@ -56,7 +56,14 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         abort_if($category->restaurant_id !== $request->user()->restaurant_id, 403);
-        $request->validate(['name' => 'sometimes|string|max:100', 'parent_id' => 'nullable|exists:categories,id', 'order' => 'integer|min:0', 'active' => 'boolean']);
+        $request->validate([
+            'name'        => 'sometimes|string|max:100',
+            'parent_id'   => 'nullable|exists:categories,id',
+            'order'       => 'integer|min:0',
+            'active'      => 'nullable',
+            'destination' => 'nullable|in:kitchen,bar,pizza',
+            'color'       => 'nullable|string|max:20',
+        ]);
 
         if ($request->hasFile('image')) {
             if ($category->image) Storage::disk('public')->delete($category->image);
