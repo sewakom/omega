@@ -22,10 +22,10 @@
     font-size: 11px;
     color: #000;
     width: auto;
-    margin-left: 15px;
-    margin-right: 15px;
+    margin-left: 2px;
+    margin-right: 2px;
     padding-top: 15px;
-    padding-bottom: 15px;
+    padding-bottom: 5px;
     background: #fff;
     line-height: 1.4;
     overflow: hidden;
@@ -84,7 +84,7 @@
   {{-- EN-TÊTE RESTAURANT --}}
   <div class="center">
     @if(($receipt['footer']['show_logo'] ?? true) && $receipt['restaurant']['logo'])
-    <img src="{{ $receipt['restaurant']['logo'] }}" class="logo" alt="Logo">
+    <img src="{{ $receipt['restaurant']['logo'] }}" class="logo" alt="">
   @endif
   <div class="bold xlarge">{{ $receipt['restaurant']['name'] }}</div>
   @if($receipt['restaurant']['address'])

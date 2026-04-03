@@ -75,7 +75,7 @@ class TicketPrintService
         $restaurant = $order->restaurant;
         $logoHtml = $restaurant->logo 
             ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
-            : "<div style='font-size:16px;font-weight:900;text-transform:uppercase;opacity:0.2;transform:rotate(-15deg);position:absolute;z-index:-1;top:50%;left:10%;right:10%;text-align:center;'>{$restaurant->name}</div>";
+            : "";
 
         $restaurant = $order->restaurant;
         $restoPhone = $restaurant->phone ? " | Tél: {$restaurant->phone}" : '';
@@ -178,7 +178,7 @@ class TicketPrintService
 
         $logoHtml = $restaurant->logo 
             ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
-            : "<div style='font-size:16px;font-weight:900;text-transform:uppercase;opacity:0.1;transform:rotate(-15deg);position:absolute;z-index:-1;top:50%;left:10%;right:10%;text-align:center;'>{$restaurant->name}</div>";
+            : "";
 
 
         $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci de votre visite !';
@@ -305,7 +305,7 @@ class TicketPrintService
 
         $logoHtml = $restaurant->logo 
             ? "<img src='{$restaurant->logo}' style='max-height:25mm;'>" 
-            : "<div style='font-size:40px;font-weight:900;text-transform:uppercase;opacity:0.05;transform:rotate(-30deg);position:absolute;z-index:-1;top:40%;left:5%;right:5%;text-align:center;'>{$restaurant->name}</div>";
+            : "";
 
         $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance';
 
