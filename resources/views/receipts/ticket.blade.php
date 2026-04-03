@@ -8,10 +8,10 @@
 <style>
   @page { margin: 0px; }
   body { 
-    margin: 0px; 
-    padding: 0px; 
+    margin: 0; 
+    padding: 0; 
     background: #fff; 
-    width: {{ $config['receipt_width'] ?? '80mm' }};
+    width: 100%;
   }
 </style>
 @endif
@@ -22,10 +22,8 @@
     font-size: 11px;
     color: #000;
     width: auto;
-    margin-left: 2px;
-    margin-right: 2px;
-    padding-top: 15px;
-    padding-bottom: 5px;
+    margin: 0 15px;
+    padding: 15px 0 5px 0;
     background: #fff;
     line-height: 1.4;
     overflow: hidden;
