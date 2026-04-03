@@ -86,7 +86,7 @@ class TicketPrintService
 <meta charset='UTF-8'>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 13px; width: 58mm; padding: 4px; overflow: hidden; position: relative; }
+  body { font-family: 'Courier New', monospace; font-size: 13px; width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px; overflow: hidden; position: relative; }
   .header { text-align: center; border-bottom: 2px dashed #000; padding-bottom: 6px; margin-bottom: 6px; position: relative; }
   .destination { font-size: 18px; font-weight: bold; letter-spacing: 2px; }
   .order-num { font-size: 12px; margin-top: 2px; font-weight: bold; }
@@ -190,7 +190,7 @@ class TicketPrintService
 <meta charset='UTF-8'>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; font-size: 11px; width: 58mm; padding: 4px; position: relative; overflow: hidden; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; width: 100%; max-width: 80mm; margin: 0 auto; padding: 4px; position: relative; overflow: hidden; }
   .header { text-align: center; margin-bottom: 6px; border-bottom: 1px dashed #000; padding-bottom: 4px; }
   .resto-name { font-size: 15px; font-weight: bold; text-transform: uppercase; }
   .line { display: flex; justify-content: space-between; padding: 2px 0; }
@@ -593,8 +593,8 @@ class TicketPrintService
         $restaurant = $order->restaurant;
         $items      = $order->items->whereNotIn('status', ['cancelled']);
 
-        $pdf = new Fpdf('P', 'mm', array(58, 200 + ($items->count() * 15)));
-        $pdf->SetMargins(4, 5, 4);
+        $pdf = new Fpdf('P', 'mm', array(80, 200 + ($items->count() * 15)));
+        $pdf->SetMargins(5, 5, 5);
         $pdf->AddPage();
         
         $pdf->SetFont('Courier', 'B', 12);
@@ -608,46 +608,48 @@ class TicketPrintService
         if ($restaurant->phone)   $pdf->Cell(0, 4, 'Tel : ' . $restaurant->phone, 0, 1, 'C');
         if ($restaurant->vat_number) $pdf->Cell(0, 4, 'TVA : ' . $restaurant->vat_number, 0, 1, 'C');
         
-        $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
         
         $pdf->SetFont('Courier', 'B', 9);
-        $pdf->Cell(30, 5, 'TICKET DE CAISSE', 0, 0);
-        $pdf->Cell(20, 5, $order->order_number, 0, 1, 'R');
+        $pdf->Cell(40, 5, 'TICKET DE CAISSE', 0, 0);
+        $pdf->Cell(30, 5, $order->order_number, 0, 1, 'R');
         
         $pdf->SetFont('Courier', '', 8);
-        $pdf->Cell(30, 4, 'Date', 0, 0);
-        $pdf->Cell(20, 4, $order->created_at->format('d/m/Y H:i'), 0, 1, 'R');
+        $pdf->Cell(40, 4, 'Date', 0, 0);
+        $pdf->Cell(30, 4, $order->created_at->format('d/m/Y H:i'), 0, 1, 'R');
         
         if ($order->table) {
-            $pdf->Cell(30, 4, 'Table', 0, 0);
+            $pdf->Cell(40, 4, 'Table', 0, 0);
             $tableNum = ($order->table instanceof \App\Models\Table) ? $order->table->number : 'N/A';
-            $pdf->Cell(20, 4, $tableNum, 0, 1, 'R');
+            $pdf->Cell(30, 4, $tableNum, 0, 1, 'R');
         }
         
-        $pdf->Cell(30, 4, 'Type', 0, 0);
-        $pdf->Cell(20, 4, strtoupper($order->type), 0, 1, 'R');
+        $pdf->Cell(40, 4, 'Type', 0, 0);
+        $pdf->Cell(30, 4, strtoupper($order->type), 0, 1, 'R');
 
         if ($order->waiter) {
-            $pdf->Cell(30, 4, 'Serveur', 0, 0);
-            $pdf->Cell(20, 4, utf8_decode($order->waiter->name), 0, 1, 'R');
+            $pdf->Cell(40, 4, 'Serveur', 0, 0);
+            $pdf->Cell(30, 4, utf8_decode($order->waiter->name), 0, 1, 'R');
         }
 
-        $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
         // LIGNES ARTICLES
+        // Usable width is 80 - 5 - 5 = 70.
+        // Let's divide: Article(35) Qt(10) PU(10) Total(15) = 70
         $pdf->SetFont('Courier', 'B', 8);
-        $pdf->Cell(20, 5, 'Article', 0, 0);
+        $pdf->Cell(35, 5, 'Article', 0, 0);
         $pdf->Cell(10, 5, 'Qt', 0, 0, 'C');
         $pdf->Cell(10, 5, 'PU', 0, 0, 'R');
-        $pdf->Cell(10, 5, 'Total', 0, 1, 'R');
+        $pdf->Cell(15, 5, 'Total', 0, 1, 'R');
         $pdf->SetFont('Courier', '', 8);
 
         foreach ($items as $item) {
             $lineTotal = $item->quantity * $item->unit_price;
-            $pdf->Cell(20, 4, utf8_decode(substr($item->product->name, 0, 12)), 0, 0);
+            $pdf->Cell(35, 4, utf8_decode(substr($item->product->name, 0, 20)), 0, 0);
             $pdf->Cell(10, 4, $item->quantity, 0, 0, 'C');
             $pdf->Cell(10, 4, number_format($item->unit_price, 0, '', ''), 0, 0, 'R');
-            $pdf->Cell(10, 4, number_format($lineTotal, 0, '', ''), 0, 1, 'R');
+            $pdf->Cell(15, 4, number_format($lineTotal, 0, '', ''), 0, 1, 'R');
 
             if ($item->notes) {
                 $pdf->SetFont('Courier', 'I', 7);
@@ -657,26 +659,26 @@ class TicketPrintService
             }
         }
 
-        $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
         // TOTAUX
-        $pdf->Cell(35, 4, 'Sous-total', 0, 0);
-        $pdf->Cell(15, 4, number_format((float) $order->subtotal, 0, '.', ' '), 0, 1, 'R');
+        $pdf->Cell(45, 4, 'Sous-total', 0, 0);
+        $pdf->Cell(25, 4, number_format((float) $order->subtotal, 0, '.', ' '), 0, 1, 'R');
         
         if ($order->discount_amount > 0) {
-            $pdf->Cell(35, 4, 'Remise', 0, 0);
-            $pdf->Cell(15, 4, '-' . number_format((float) $order->discount_amount, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(45, 4, 'Remise', 0, 0);
+            $pdf->Cell(25, 4, '-' . number_format((float) $order->discount_amount, 0, '.', ' '), 0, 1, 'R');
         }
 
-        $pdf->Cell(35, 4, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0);
-        $pdf->Cell(15, 4, number_format((float) $order->vat_amount, 0, '.', ' '), 0, 1, 'R');
+        $pdf->Cell(45, 4, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0);
+        $pdf->Cell(25, 4, number_format((float) $order->vat_amount, 0, '.', ' '), 0, 1, 'R');
 
         $pdf->SetFont('Courier', 'B', 10);
-        $pdf->Cell(35, 6, 'TOTAL', 0, 0);
-        $pdf->Cell(15, 6, number_format((float) $order->total, 0, '.', ' '), 0, 1, 'R');
+        $pdf->Cell(45, 6, 'TOTAL', 0, 0);
+        $pdf->Cell(25, 6, number_format((float) $order->total, 0, '.', ' '), 0, 1, 'R');
         $pdf->SetFont('Courier', '', 8);
 
-        $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
         // PAIEMENTS
         $pdf->SetFont('Courier', 'B', 8);
@@ -684,19 +686,19 @@ class TicketPrintService
         $pdf->SetFont('Courier', '', 8);
         
         foreach ($order->payments as $pmt) {
-            $pdf->Cell(35, 4, utf8_decode(strtoupper($pmt->method)), 0, 0);
-            $pdf->Cell(15, 4, number_format($pmt->amount, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(45, 4, utf8_decode(strtoupper($pmt->method)), 0, 0);
+            $pdf->Cell(25, 4, number_format($pmt->amount, 0, '.', ' '), 0, 1, 'R');
             
             if ($pmt->amount_given) {
                 $pdf->SetFont('Courier', '', 7);
-                $pdf->Cell(35, 3, utf8_decode('  Recu'), 0, 0);
-                $pdf->Cell(15, 3, number_format($pmt->amount_given, 0, '.', ' '), 0, 1, 'R');
+                $pdf->Cell(45, 3, utf8_decode('  Recu'), 0, 0);
+                $pdf->Cell(25, 3, number_format($pmt->amount_given, 0, '.', ' '), 0, 1, 'R');
                 $pdf->SetFont('Courier', '', 8);
             }
             if ($pmt->change_given) {
                 $pdf->SetFont('Courier', '', 7);
-                $pdf->Cell(35, 3, utf8_decode('  Rendu'), 0, 0);
-                $pdf->Cell(15, 3, number_format($pmt->change_given, 0, '.', ' '), 0, 1, 'R');
+                $pdf->Cell(45, 3, utf8_decode('  Rendu'), 0, 0);
+                $pdf->Cell(25, 3, number_format($pmt->change_given, 0, '.', ' '), 0, 1, 'R');
                 $pdf->SetFont('Courier', '', 8);
             }
         }
@@ -704,22 +706,22 @@ class TicketPrintService
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');
         if ($totalGiven > 0) {
-            $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+            $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
             $pdf->SetFont('Courier', 'B', 9);
-            $pdf->Cell(30, 4, utf8_decode('DONNE PAR CLIENT'), 0, 0);
-            $pdf->Cell(20, 4, number_format($totalGiven, 0, '.', ' '), 0, 1, 'R');
-            $pdf->Cell(30, 4, utf8_decode('MONNAIE RENDUE'), 0, 0);
-            $pdf->Cell(20, 4, number_format($totalChange, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(40, 4, utf8_decode('DONNE PAR CLIENT'), 0, 0);
+            $pdf->Cell(30, 4, number_format($totalGiven, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(40, 4, utf8_decode('MONNAIE RENDUE'), 0, 0);
+            $pdf->Cell(30, 4, number_format($totalChange, 0, '.', ' '), 0, 1, 'R');
             $pdf->SetFont('Courier', '', 8);
         }
 
-        $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
         if ($order->paid_at) {
             $pdf->SetFont('Courier', 'B', 14);
             $pdf->Cell(0, 8, utf8_decode('*** PAYÉ ***'), 0, 1, 'C');
             $pdf->SetFont('Courier', '', 8);
-            $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+            $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
         }
 
         // PIED DE PAGE
