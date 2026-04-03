@@ -6,6 +6,15 @@ use App\Http\Controllers\Api;
 // =============================================
 // ROUTES PUBLIQUES
 // =============================================
+
+// Fallback media route to bypass strict Nginx /storage/ directives on Laravel Cloud
+Route::get('media/{path}', function ($path) {
+    if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+    return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($path));
+})->where('path', '.*');
+
 Route::prefix('auth')->group(function () {
     Route::post('login',     [Api\Auth\AuthController::class, 'login']);
     Route::post('login-pin', [Api\Auth\AuthController::class, 'loginPin']);

@@ -30,7 +30,7 @@ class Product extends Model
 
     public function getImageUrlAttribute()
     {
-        return $this->image ? asset('storage/' . $this->image) : null;
+        return $this->image ? url('api/media/' . $this->image) : null;
     }
 
     public function restaurant()     { return $this->belongsTo(Restaurant::class); }
