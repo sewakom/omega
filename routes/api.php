@@ -104,7 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',                           [Api\CustomerTabController::class, 'index']);
         Route::post('/',                          [Api\CustomerTabController::class, 'store']);
         Route::get('/{tab}',                      [Api\CustomerTabController::class, 'show']);
-        Route::post('/{tab}/attach-order',        [Api\CustomerTabController::class, 'attachOrder']);
+        Route::post('/{tab}/attach',              [Api\CustomerTabController::class, 'attachOrder']);
         Route::post('/{tab}/pay',                 [Api\CustomerTabController::class, 'pay']);
         Route::post('/{tab}/cancel',              [Api\CustomerTabController::class, 'cancel']);
     });
