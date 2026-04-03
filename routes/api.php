@@ -22,6 +22,8 @@ Route::prefix('auth')->group(function () {
 
 Route::get('menu/{restaurantSlug}', [Api\ProductController::class, 'publicMenu']);
 Route::get('orders/{orderId}/ticket', [Api\ReceiptController::class, 'ticket']);
+Route::get('customer-tabs/{tab}/invoice', [Api\CustomerTabController::class, 'invoice']);
+Route::get('receipts/{orderId}/kitchen-ticket', [Api\ReceiptController::class, 'kitchenTicket']);
 
 // =============================================
 // ROUTES PROTÉGÉES
@@ -104,7 +106,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{tab}',                      [Api\CustomerTabController::class, 'show']);
         Route::post('/{tab}/attach-order',        [Api\CustomerTabController::class, 'attachOrder']);
         Route::post('/{tab}/pay',                 [Api\CustomerTabController::class, 'pay']);
-        Route::get('/{tab}/invoice',              [Api\CustomerTabController::class, 'invoice']);
         Route::post('/{tab}/cancel',              [Api\CustomerTabController::class, 'cancel']);
     });
 
@@ -174,8 +175,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{orderId}/html',        [Api\ReceiptController::class, 'html']);
         Route::get('{orderId}/a4',          [Api\ReceiptController::class, 'invoiceA4']);
         Route::post('{orderId}/send-email', [Api\ReceiptController::class, 'sendEmail']);
-        // Tickets cuisine SANS prix par destination
-        Route::get('{orderId}/kitchen-ticket', [Api\ReceiptController::class, 'kitchenTicket']);
     });
 
     // QR Code
