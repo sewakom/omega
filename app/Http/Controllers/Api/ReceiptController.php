@@ -121,7 +121,22 @@ class ReceiptController extends Controller
             ->findOrFail($orderId);
 
         $destination = $request->get('destination', 'kitchen');
-        abort_unless(in_array($destination, ['kitchen', 'bar', 'pizza']), 422, 'Destination invalide.');
+        abort_unless(in_array($destination, ['kitchen', 'bar', 'pizza', 'all']), 422, 'Destination invalide.');
+
+        if ($destination === 'all') {
+            $fullHtml = '';
+            foreach (['kitchen', 'bar', 'pizza'] as $dest) {
+                $html = $this->ticketService->kitchenTicketHtml($order, $dest);
+                if ($html) {
+                    // Wrap with a page break for the thermal printer
+                    $fullHtml .= $html . '<div style="page-break-after: always; margin: 20px 0; border-bottom: 2px dashed #000;"></div>';
+                }
+            }
+            if (!$fullHtml) {
+                return response()->json(['message' => "Aucun item pour ces destinations."], 404);
+            }
+            return response($fullHtml)->header('Content-Type', 'text/html');
+        }
 
         $html = $this->ticketService->kitchenTicketHtml($order, $destination);
 
