@@ -124,7 +124,7 @@ class TicketPrintService
      */
     public function receiptHtml(Order $order): string
     {
-        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter']);
+        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter', 'cashier']);
         $restaurant = $order->restaurant;
         $items = $order->items->whereNotIn('status', ['cancelled']);
 
@@ -142,11 +142,28 @@ class TicketPrintService
         foreach ($order->payments as $pmt) {
             $method = strtoupper($pmt->method);
             $amt    = number_format($pmt->amount, 0, ',', ' ');
-            $paymentsHtml .= "<div class='line'><span>{$method}</span><span>{$amt}</span></div>";
+            $paymentsHtml .= "<div class='line'><span>{$method}</span><span>{$amt} FCFA</span></div>";
+            if ($pmt->amount_given) {
+                $given = number_format($pmt->amount_given, 0, ',', ' ');
+                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Donn\u00e9</span><span>{$given} FCFA</span></div>";
+            }
             if ($pmt->change_given) {
                 $change = number_format($pmt->change_given, 0, ',', ' ');
-                $paymentsHtml .= "<div class='line'><span>Monnaie rendue</span><span>{$change}</span></div>";
+                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Rendu</span><span>{$change} FCFA</span></div>";
             }
+        }
+        $totalGiven = $order->payments->sum('amount_given');
+        $totalChange = $order->payments->sum('change_given');
+        $givenChangeHtml = '';
+        if ($totalGiven > 0) {
+            $fmtGiven = number_format($totalGiven, 0, ',', ' ');
+            $fmtChange = number_format($totalChange, 0, ',', ' ');
+            $givenChangeHtml = "
+            <div class='divider'></div>
+            <div style='border:2px solid #000;padding:4px;margin:4px 0'>
+              <div class='line total-line'><span>DONN\u00c9</span><span>{$fmtGiven} FCFA</span></div>
+              <div class='line total-line'><span>RENDU</span><span>{$fmtChange} FCFA</span></div>
+            </div>";
         }
 
         $tableLabel  = $order->table ? "Table {$order->table->number}" : ucfirst($order->type);
@@ -155,7 +172,8 @@ class TicketPrintService
         $vat         = number_format((float) ($order->vat_amount ?? 0), 0, ',', ' ');
         $total       = number_format((float) ($order->total ?? 0), 0, ',', ' ');
         $date        = now()->format('d/m/Y H:i');
-        $cashier     = $order->waiter?->first_name ?? 'Caisse';
+        $serveur     = $order->waiter ? ($order->waiter->first_name . ' ' . $order->waiter->last_name) : null;
+        $cashierName = $order->cashier ? $order->cashier->first_name : 'Caisse';
         $restoAddress = $restaurant->address ?? '';
 
         $logoHtml = $restaurant->logo 
@@ -180,6 +198,7 @@ class TicketPrintService
   .total-line { font-weight: bold; font-size: 14px; }
   .footer { text-align: center; margin-top: 10px; font-size: 10px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; }
   .table-box { border: 2px solid #000; font-weight: 900; text-align: center; padding: 4px; margin: 4px 0; font-size: 14px; }
+  .paid-stamp { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 28px; font-weight: 900; color: rgba(0,128,0,0.3); border: 4px solid rgba(0,128,0,0.3); padding: 6px 16px; letter-spacing: 4px; border-radius: 8px; pointer-events: none; z-index: 999; }
   @media print { @page { margin: 0; } }
 </style>
 </head>
@@ -193,7 +212,8 @@ class TicketPrintService
   </div>
   <div class='table-box'>{$tableLabel}</div>
   <div class='line'><span>Ticket</span><span>#{$order->order_number}</span></div>
-  <div class='line'><span>Caissier: {$cashier}</span></div>
+  " . ($serveur ? "<div class='line'><span>Serveur</span><span>{$serveur}</span></div>" : "") . "
+  <div class='line'><span>Caissier</span><span>{$cashierName}</span></div>
   <div class='divider'></div>
   {$itemsHtml}
   <div class='divider'></div>
@@ -203,6 +223,8 @@ class TicketPrintService
   <div class='line total-line'><span>TOTAL</span><span>{$total} FCFA</span></div>
   <div class='divider'></div>
   {$paymentsHtml}
+  {$givenChangeHtml}
+  " . ($order->paid_at ? "<div class='paid-stamp'>PAY\u00c9</div>" : "") . "
   <div class='footer'>{$thanksMsg}<br>{$restaurant->name}</div>
 </body>
 </html>";
@@ -238,7 +260,28 @@ class TicketPrintService
             $method = strtoupper($pmt->method);
             $amt    = number_format($pmt->amount, 0, ',', ' ');
             $paymentsHtml .= "<tr><td>{$method}</td><td style='text-align:right'>{$amt} FCFA</td></tr>";
+            if ($pmt->amount_given) {
+                $given = number_format($pmt->amount_given, 0, ',', ' ');
+                $paymentsHtml .= "<tr><td style='padding-left:15px;color:#666;font-size:10px'>Donné par le client</td><td style='text-align:right;color:#666;font-size:10px'>{$given} FCFA</td></tr>";
+            }
+            if ($pmt->change_given) {
+                $change = number_format($pmt->change_given, 0, ',', ' ');
+                $paymentsHtml .= "<tr><td style='padding-left:15px;color:#666;font-size:10px'>Monnaie rendue</td><td style='text-align:right;color:#666;font-size:10px'>{$change} FCFA</td></tr>";
+            }
         }
+        $totalGiven = $order->payments->sum('amount_given');
+        $totalChange = $order->payments->sum('change_given');
+        $givenSummaryHtml = '';
+        if ($totalGiven > 0) {
+            $fmtGiven = number_format($totalGiven, 0, ',', ' ');
+            $fmtChange = number_format($totalChange, 0, ',', ' ');
+            $givenSummaryHtml = "
+            <table style='width:50%;margin-top:8px;border:2px solid #1a1a2e;border-radius:6px;'>
+              <tr style='background:#f0f0f5'><td style='font-weight:bold;padding:6px'>DONNÉ PAR LE CLIENT</td><td style='text-align:right;font-weight:bold;padding:6px'>{$fmtGiven} FCFA</td></tr>
+              <tr style='background:#f0f0f5'><td style='font-weight:bold;padding:6px'>MONNAIE RENDUE</td><td style='text-align:right;font-weight:bold;padding:6px'>{$fmtChange} FCFA</td></tr>
+            </table>";
+        }
+        $waiterName = $order->waiter ? ($order->waiter->first_name . ' ' . $order->waiter->last_name) : null;
 
         $locationLabel = $order->table ? "Table {$order->table->number}" : ucfirst(str_replace('_', ' ', $order->type));
         $subtotal    = number_format((float) ($order->subtotal ?? 0), 0, ',', ' ');
@@ -285,6 +328,8 @@ class TicketPrintService
   .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #1a1a2e; padding-top: 6px; }
   .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 8px; }
   .table-badge { background: #1a1a2e; color: white; padding: 3px 10px; border-radius: 20px; font-weight: bold; font-size: 12px; }
+  .paid-watermark { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 72px; font-weight: 900; color: rgba(0,128,0,0.15); border: 8px solid rgba(0,128,0,0.15); padding: 15px 50px; letter-spacing: 10px; border-radius: 15px; pointer-events: none; z-index: 10; }
+  .serveur-badge { background: #e8e8f0; padding: 4px 10px; border-radius: 4px; font-size: 11px; display: inline-block; margin-bottom: 8px; }
   @media print { @page { size: A4; margin: 10mm; } }
 </style>
 </head>
@@ -305,6 +350,8 @@ class TicketPrintService
     </div>
   </div>
   <hr class='divider'>
+  " . ($order->paid_at ? "<div class='paid-watermark'>PAYÉ</div>" : "") . "
+  " . ($waiterName ? "<div class='serveur-badge'>Serveur : <strong>{$waiterName}</strong></div>" : "") . "
   {$customerBlock}
   <table>
     <thead>
@@ -331,6 +378,7 @@ class TicketPrintService
     <table style='width:50%;'>
       {$paymentsHtml}
     </table>
+    {$givenSummaryHtml}
   </div>
   <div class='footer'>
     {$thanksMsg} — {$restaurant->name} — Document certifié
@@ -477,6 +525,50 @@ class TicketPrintService
         foreach ($order->payments as $pmt) {
             $pdf->Cell(50, 5, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
             $pdf->Cell(50, 5, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
+            if ($pmt->amount_given) {
+                $pdf->SetFont('Helvetica', '', 8);
+                $pdf->SetTextColor(100, 100, 100);
+                $pdf->Cell(50, 4, utf8_decode('  Donn\u00e9 par le client'), 0, 0, 'L');
+                $pdf->Cell(50, 4, number_format($pmt->amount_given, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetFont('Helvetica', '', 9);
+            }
+            if ($pmt->change_given) {
+                $pdf->SetFont('Helvetica', '', 8);
+                $pdf->SetTextColor(100, 100, 100);
+                $pdf->Cell(50, 4, utf8_decode('  Monnaie rendue'), 0, 0, 'L');
+                $pdf->Cell(50, 4, number_format($pmt->change_given, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetFont('Helvetica', '', 9);
+            }
+        }
+
+        // Summary: total given & change
+        $totalGiven = $order->payments->sum('amount_given');
+        $totalChange = $order->payments->sum('change_given');
+        if ($totalGiven > 0) {
+            $pdf->Ln(3);
+            $pdf->SetFont('Helvetica', 'B', 10);
+            $pdf->SetFillColor(240, 240, 245);
+            $pdf->SetDrawColor(26, 26, 46);
+            $pdf->Cell(60, 8, utf8_decode(' DONN\u00c9 PAR LE CLIENT'), 1, 0, 'L', true);
+            $pdf->Cell(40, 8, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
+            $pdf->Cell(60, 8, ' MONNAIE RENDUE', 1, 0, 'L', true);
+            $pdf->Cell(40, 8, number_format($totalChange, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
+            $pdf->SetDrawColor(0, 0, 0);
+        }
+
+        // PAID Stamp
+        if ($order->paid_at) {
+            $pdf->Ln(5);
+            $pdf->SetFont('Helvetica', 'B', 32);
+            $pdf->SetTextColor(0, 150, 0);
+            $pdf->SetDrawColor(0, 150, 0);
+            $xStamp = ($pdf->GetPageWidth() - 80) / 2;
+            $pdf->SetX($xStamp);
+            $pdf->Cell(80, 18, utf8_decode('PAY\u00c9'), 3, 1, 'C');
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetDrawColor(0, 0, 0);
         }
 
         // Footer — positionné après le contenu (pas en absolu)
@@ -544,16 +636,16 @@ class TicketPrintService
 
         // LIGNES ARTICLES
         $pdf->SetFont('Courier', 'B', 8);
-        $pdf->Cell(24, 5, 'Article', 0, 0);
-        $pdf->Cell(6, 5, 'Qt', 0, 0, 'C');
+        $pdf->Cell(20, 5, 'Article', 0, 0);
+        $pdf->Cell(10, 5, 'Qt', 0, 0, 'C');
         $pdf->Cell(10, 5, 'PU', 0, 0, 'R');
         $pdf->Cell(10, 5, 'Total', 0, 1, 'R');
         $pdf->SetFont('Courier', '', 8);
 
         foreach ($items as $item) {
             $lineTotal = $item->quantity * $item->unit_price;
-            $pdf->Cell(24, 4, utf8_decode(substr($item->product->name, 0, 14)), 0, 0);
-            $pdf->Cell(6, 4, $item->quantity, 0, 0, 'C');
+            $pdf->Cell(20, 4, utf8_decode(substr($item->product->name, 0, 12)), 0, 0);
+            $pdf->Cell(10, 4, $item->quantity, 0, 0, 'C');
             $pdf->Cell(10, 4, number_format($item->unit_price, 0, '', ''), 0, 0, 'R');
             $pdf->Cell(10, 4, number_format($lineTotal, 0, '', ''), 0, 1, 'R');
 
@@ -609,7 +701,26 @@ class TicketPrintService
             }
         }
 
+        $totalGiven = $order->payments->sum('amount_given');
+        $totalChange = $order->payments->sum('change_given');
+        if ($totalGiven > 0) {
+            $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+            $pdf->SetFont('Courier', 'B', 9);
+            $pdf->Cell(30, 4, utf8_decode('DONNE PAR CLIENT'), 0, 0);
+            $pdf->Cell(20, 4, number_format($totalGiven, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(30, 4, utf8_decode('MONNAIE RENDUE'), 0, 0);
+            $pdf->Cell(20, 4, number_format($totalChange, 0, '.', ' '), 0, 1, 'R');
+            $pdf->SetFont('Courier', '', 8);
+        }
+
         $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+
+        if ($order->paid_at) {
+            $pdf->SetFont('Courier', 'B', 14);
+            $pdf->Cell(0, 8, utf8_decode('*** PAYÉ ***'), 0, 1, 'C');
+            $pdf->SetFont('Courier', '', 8);
+            $pdf->Cell(0, 4, '----------------------------------', 0, 1, 'C');
+        }
 
         // PIED DE PAGE
         $pdf->SetFont('Courier', 'B', 9);
@@ -740,7 +851,7 @@ class TicketPrintService
         $pdf->SetY(-30);
         $pdf->SetFont('Arial', 'I', 8);
         $pdf->SetTextColor(150);
-        $pdf->Cell(0, 5, utf8_decode('Certifié par Omega POS — Document original'), 0, 1, 'C');
+        $pdf->Cell(0, 5, utf8_decode('Certifié par SmartFlow POS — Document original'), 0, 1, 'C');
         $pdf->Cell(0, 5, utf8_decode('Merci pour votre confiance chez ' . $restaurant->name), 0, 1, 'C');
         
         return $pdf->Output('S');

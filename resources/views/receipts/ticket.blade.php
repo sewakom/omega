@@ -29,6 +29,32 @@
     background: #fff;
     line-height: 1.4;
     overflow: hidden;
+    position: relative;
+  }
+  .receipt-wrap .paid-stamp {
+    position: absolute;
+    top: 45%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 36px; font-weight: 900;
+    color: rgba(0, 128, 0, 0.25);
+    border: 5px solid rgba(0, 128, 0, 0.25);
+    padding: 8px 25px;
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    pointer-events: none;
+    z-index: 10;
+    border-radius: 10px;
+  }
+  .receipt-wrap .given-change-box {
+    background: #f8f8f8;
+    border: 1.5px solid #000;
+    padding: 5px;
+    margin-top: 6px;
+  }
+  .receipt-wrap .given-change-box td {
+    font-weight: bold;
+    font-size: 12px;
+    padding: 2px 0;
   }
   .receipt-wrap .center  { text-align: center; }
   .receipt-wrap .right   { text-align: right; }
@@ -52,6 +78,9 @@
 @endif
 
 <div class="receipt-wrap">
+  @if($receipt['order']['paid_at'])
+  <div class="paid-stamp">PAYÉ</div>
+  @endif
   {{-- EN-TÊTE RESTAURANT --}}
   <div class="center">
     @if(($receipt['footer']['show_logo'] ?? true) && $receipt['restaurant']['logo'])
@@ -139,6 +168,19 @@
 @if($receipt['totals']['change'] > 0)
 <div class="divider-solid"></div>
 <table><tr><td class="bold">Monnaie rendue</td><td class="td-right bold">{{ $receipt['totals']['change_fmt'] }}</td></tr></table>
+@endif
+
+@php
+  $totalGiven = collect($receipt['payments'])->sum('amount_given');
+  $totalChange = collect($receipt['payments'])->sum('change_given');
+@endphp
+@if($totalGiven > 0)
+<div class="given-change-box">
+  <table>
+    <tr><td>DONNÉ PAR LE CLIENT</td><td class="td-right">{{ number_format($totalGiven, 0, '.', ' ') }} {{ $config['currency_symbol'] ?? 'FCFA' }}</td></tr>
+    <tr><td>MONNAIE RENDUE</td><td class="td-right">{{ number_format($totalChange, 0, '.', ' ') }} {{ $config['currency_symbol'] ?? 'FCFA' }}</td></tr>
+  </table>
+</div>
 @endif
 
 <div class="divider"></div>
