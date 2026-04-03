@@ -271,21 +271,21 @@ class TicketPrintService
 <head>
 <meta charset='UTF-8'>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 20mm 15mm; position: relative; overflow: hidden; }
-  .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-  .resto-info h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; text-transform: uppercase; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 10mm 12mm; position: relative; overflow: hidden; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .resto-info h1 { font-size: 20px; color: #1a1a2e; margin-bottom: 2px; text-transform: uppercase; }
   .invoice-info { text-align: right; }
-  .invoice-info h2 { font-size: 20px; color: #16213e; margin-bottom: 10px; }
-  .divider { border: none; border-top: 2px solid #1a1a2e; margin: 10px 0; }
-  .customer-block { background: #f5f5f5; padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #1a1a2e; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th { background: #1a1a2e; color: white; padding: 10px; text-align: left; }
-  td { padding: 8px 10px; border-bottom: 1px solid #eee; }
-  .totals-table td { border: none; padding: 5px 10px; }
-  .total-row td { font-weight: bold; font-size: 16px; border-top: 2px solid #1a1a2e; padding-top: 10px; }
-  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #666; border-top: 1px solid #eee; padding-top: 15px; }
-  .table-badge { background: #1a1a2e; color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-  @media print { @page { size: A4; margin: 15mm; } }
+  .invoice-info h2 { font-size: 18px; color: #16213e; margin-bottom: 6px; }
+  .divider { border: none; border-top: 2px solid #1a1a2e; margin: 6px 0; }
+  .customer-block { background: #f5f5f5; padding: 8px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #1a1a2e; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  th { background: #1a1a2e; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eee; }
+  .totals-table td { border: none; padding: 3px 8px; }
+  .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #1a1a2e; padding-top: 6px; }
+  .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 8px; }
+  .table-badge { background: #1a1a2e; color: white; padding: 3px 10px; border-radius: 20px; font-weight: bold; font-size: 12px; }
+  @media print { @page { size: A4; margin: 10mm; } }
 </style>
 </head>
 <body>
@@ -326,8 +326,8 @@ class TicketPrintService
     <tr><td>TVA ({$vatRate}%)</td><td style='text-align:right'>{$vat} FCFA</td></tr>
     <tr class='total-row'><td>TOTAL À PAYER</td><td style='text-align:right'>{$total} FCFA</td></tr>
   </table>
-  <div style='margin-top:40px;'>
-    <h3 style='border-bottom:1px solid #eee; padding-bottom:5px; font-size:12px; margin-bottom:10px;'>DÉTAILS PAIEMENT</h3>
+  <div style='margin-top:10px;'>
+    <h3 style='border-bottom:1px solid #eee; padding-bottom:3px; font-size:11px; margin-bottom:6px;'>DÉTAILS PAIEMENT</h3>
     <table style='width:50%;'>
       {$paymentsHtml}
     </table>
@@ -377,7 +377,7 @@ class TicketPrintService
             $pdf->Cell(100, 5, 'TVA : ' . $restaurant->vat_number, 0, 1, 'L');
         }
 
-        $pdf->Ln(10);
+        $pdf->Ln(6);
 
         // Two Columns: Order Details & Customer
         $yBefore = $pdf->GetY();
@@ -411,7 +411,7 @@ class TicketPrintService
             $pdf->Cell(85, 8, 'CLIENT DE PASSAGE', 0, 1, 'L');
         }
 
-        $pdf->Ln(12);
+        $pdf->Ln(6);
 
         // Table Header
         $pdf->SetFillColor(26, 26, 46);
@@ -443,7 +443,7 @@ class TicketPrintService
             }
         }
 
-        $pdf->Ln(8);
+        $pdf->Ln(4);
 
         // Totals
         $pdf->SetX(120);
@@ -470,19 +470,22 @@ class TicketPrintService
         $pdf->SetTextColor(0, 0, 0);
 
         // Payments
-        $pdf->Ln(10);
+        $pdf->Ln(5);
         $pdf->SetFont('Helvetica', 'B', 10);
-        $pdf->Cell(100, 6, utf8_decode('DÉTAILS PAIEMENT'), 'B', 1, 'L');
-        $pdf->SetFont('Helvetica', '', 10);
+        $pdf->Cell(100, 5, utf8_decode('DÉTAILS PAIEMENT'), 'B', 1, 'L');
+        $pdf->SetFont('Helvetica', '', 9);
         foreach ($order->payments as $pmt) {
-            $pdf->Cell(50, 6, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
-            $pdf->Cell(50, 6, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
+            $pdf->Cell(50, 5, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
+            $pdf->Cell(50, 5, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
         }
 
-        // Footer
-        $pdf->SetY(-20);
-        $pdf->SetFont('Helvetica', 'I', 10);
-        $pdf->Cell(0, 6, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance'), 0, 1, 'C');
+        // Footer — positionné après le contenu (pas en absolu)
+        $pdf->Ln(8);
+        $pdf->SetDrawColor(200, 200, 200);
+        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
+        $pdf->Ln(3);
+        $pdf->SetFont('Helvetica', 'I', 9);
+        $pdf->Cell(0, 5, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance'), 0, 1, 'C');
         $pdf->SetFont('Helvetica', '', 8);
         $pdf->Cell(0, 4, utf8_decode($restaurant->name . ' — Document certifié par Omega POS'), 0, 1, 'C');
 
