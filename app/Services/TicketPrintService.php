@@ -145,7 +145,7 @@ class TicketPrintService
             $paymentsHtml .= "<div class='line'><span>{$method}</span><span>{$amt} FCFA</span></div>";
             if ($pmt->amount_given) {
                 $given = number_format($pmt->amount_given, 0, ',', ' ');
-                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Donn\u00e9</span><span>{$given} FCFA</span></div>";
+                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Donné</span><span>{$given} FCFA</span></div>";
             }
             if ($pmt->change_given) {
                 $change = number_format($pmt->change_given, 0, ',', ' ');
@@ -161,7 +161,7 @@ class TicketPrintService
             $givenChangeHtml = "
             <div class='divider'></div>
             <div style='border:2px solid #000;padding:4px;margin:4px 0'>
-              <div class='line total-line'><span>DONN\u00c9</span><span>{$fmtGiven} FCFA</span></div>
+              <div class='line total-line'><span>DONNÉ</span><span>{$fmtGiven} FCFA</span></div>
               <div class='line total-line'><span>RENDU</span><span>{$fmtChange} FCFA</span></div>
             </div>";
         }
@@ -224,7 +224,7 @@ class TicketPrintService
   <div class='divider'></div>
   {$paymentsHtml}
   {$givenChangeHtml}
-  " . ($order->paid_at ? "<div class='paid-stamp'>PAY\u00c9</div>" : "") . "
+  " . ($order->paid_at ? "<div class='paid-stamp'>PAYÉ</div>" : "") . "
   <div class='footer'>{$thanksMsg}<br>{$restaurant->name}</div>
 </body>
 </html>";
@@ -442,6 +442,8 @@ class TicketPrintService
             $pdf->Cell(45, 6, 'Serveur:', 0, 0); $pdf->Cell(45, 6, utf8_decode($order->waiter->first_name . ' ' . $order->waiter->last_name), 0, 1);
         }
         
+        $yLeft = $pdf->GetY();
+
         // Info Client (Positionné à droite)
         $pdf->SetY($yBefore);
         $pdf->SetX(110);
@@ -458,6 +460,9 @@ class TicketPrintService
             $pdf->SetX(110);
             $pdf->Cell(85, 8, 'CLIENT DE PASSAGE', 0, 1, 'L');
         }
+        
+        $yRight = $pdf->GetY();
+        $pdf->SetY(max($yLeft, $yRight));
 
         $pdf->Ln(6);
 
@@ -528,7 +533,7 @@ class TicketPrintService
             if ($pmt->amount_given) {
                 $pdf->SetFont('Helvetica', '', 8);
                 $pdf->SetTextColor(100, 100, 100);
-                $pdf->Cell(50, 4, utf8_decode('  Donn\u00e9 par le client'), 0, 0, 'L');
+                $pdf->Cell(50, 4, utf8_decode('  Donné par le client'), 0, 0, 'L');
                 $pdf->Cell(50, 4, number_format($pmt->amount_given, 0, '.', ' ') . ' FCFA', 0, 1, 'L');
                 $pdf->SetTextColor(0, 0, 0);
                 $pdf->SetFont('Helvetica', '', 9);
@@ -551,7 +556,7 @@ class TicketPrintService
             $pdf->SetFont('Helvetica', 'B', 10);
             $pdf->SetFillColor(240, 240, 245);
             $pdf->SetDrawColor(26, 26, 46);
-            $pdf->Cell(60, 8, utf8_decode(' DONN\u00c9 PAR LE CLIENT'), 1, 0, 'L', true);
+            $pdf->Cell(60, 8, utf8_decode(' DONNÉ PAR LE CLIENT'), 1, 0, 'L', true);
             $pdf->Cell(40, 8, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
             $pdf->Cell(60, 8, ' MONNAIE RENDUE', 1, 0, 'L', true);
             $pdf->Cell(40, 8, number_format($totalChange, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
@@ -566,7 +571,7 @@ class TicketPrintService
             $pdf->SetDrawColor(0, 150, 0);
             $xStamp = ($pdf->GetPageWidth() - 80) / 2;
             $pdf->SetX($xStamp);
-            $pdf->Cell(80, 18, utf8_decode('PAY\u00c9'), 3, 1, 'C');
+            $pdf->Cell(80, 18, utf8_decode('PAYÉ'), 3, 1, 'C');
             $pdf->SetTextColor(0, 0, 0);
             $pdf->SetDrawColor(0, 0, 0);
         }
