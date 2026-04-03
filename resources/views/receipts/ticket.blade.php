@@ -21,9 +21,9 @@
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
     color: #000;
-    width: auto;
-    margin-left: 2px;
-    margin-right: 2px;
+    width: 100%;
+    max-width: {{ $config['receipt_width'] ?? '80mm' }};
+    margin: 0 auto;
     padding-top: 15px;
     padding-bottom: 5px;
     background: #fff;
@@ -84,7 +84,7 @@
   {{-- EN-TÊTE RESTAURANT --}}
   <div class="center">
     @if(($receipt['footer']['show_logo'] ?? true) && $receipt['restaurant']['logo'])
-    <img src="{{ $receipt['restaurant']['logo'] }}" class="logo" alt="">
+    <img src="{{ $receipt['restaurant']['logo'] }}" class="logo" alt="" onerror="this.style.display='none'; this.style.opacity='0';">
   @endif
   <div class="bold xlarge">{{ $receipt['restaurant']['name'] }}</div>
   @if($receipt['restaurant']['address'])
