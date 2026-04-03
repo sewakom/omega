@@ -117,7 +117,6 @@ class ReceiptController extends Controller
     public function kitchenTicket(Request $request, int $orderId)
     {
         $order = Order::with(['items.product.category', 'table', 'waiter'])
-            ->where('restaurant_id', $request->user()->restaurant_id)
             ->findOrFail($orderId);
 
         $destination = $request->get('destination', 'kitchen');

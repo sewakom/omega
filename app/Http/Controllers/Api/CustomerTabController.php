@@ -153,8 +153,6 @@ class CustomerTabController extends Controller
     /** Facture HTML A4 de l'ardoise */
     public function invoice(Request $request, CustomerTab $tab)
     {
-        abort_if($tab->restaurant_id !== $request->user()->restaurant_id, 403);
-
         $pdfBinary = $this->ticketService->generateTabInvoicePdf($tab);
         
         return response($pdfBinary)
