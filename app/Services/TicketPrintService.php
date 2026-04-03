@@ -814,6 +814,11 @@ class TicketPrintService
             }
         }
         
+        // Assurer qu'il y a assez d'espace pour les totaux et le footer
+        if ($pdf->GetY() > 210) {
+            $pdf->AddPage();
+        }
+
         $pdf->Ln(5);
         
         // Totaux
@@ -849,11 +854,14 @@ class TicketPrintService
         $pdf->Cell(45, 10, 'RESTE A PAYER', 0, 0);
         $pdf->Cell(35, 10, number_format($remaining, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         
-        // Footer
-        $pdf->SetY(-30);
+        // Footer aligné dynamiquement après les totaux
+        $pdf->Ln(10);
+        $pdf->SetDrawColor(200, 200, 200);
+        $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
+        $pdf->Ln(3);
         $pdf->SetFont('Arial', 'I', 8);
         $pdf->SetTextColor(150);
-        $pdf->Cell(0, 5, utf8_decode('Certifié par SmartFlow POS — Document original'), 0, 1, 'C');
+        $pdf->Cell(0, 5, utf8_decode('Certifié par Omega POS — Document original'), 0, 1, 'C');
         $pdf->Cell(0, 5, utf8_decode('Merci pour votre confiance chez ' . $restaurant->name), 0, 1, 'C');
         
         return $pdf->Output('S');

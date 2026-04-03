@@ -25,7 +25,8 @@ class ReportController extends Controller
             ->selectRaw('DATE(paid_at) as date, COUNT(*) as orders, SUM(total) as revenue')
             ->groupBy('date')->orderBy('date')->get();
 
-        $byMethod = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59']))
+        $byMethod = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
+            ->whereBetween('created_at', [$request->from, $request->to . ' 23:59:59'])
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
 
         return response()->json(['summary' => $summary, 'by_day' => $byDay, 'by_method' => $byMethod]);
@@ -73,7 +74,8 @@ class ReportController extends Controller
         $restaurantId = $request->user()->restaurant_id;
 
         $sessions = \App\Models\CashSession::with('user:id,first_name,last_name')->where('restaurant_id', $restaurantId)->whereDate('opened_at', $date)->get();
-        $payments = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('paid_at', $date))
+        $payments = Payment::whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
+            ->whereDate('created_at', $date)
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
 
         return response()->json(['date' => $date, 'sessions' => $sessions, 'payments' => $payments, 'total' => $payments->sum('total')]);

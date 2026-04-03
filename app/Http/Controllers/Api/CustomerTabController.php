@@ -101,9 +101,28 @@ class CustomerTabController extends Controller
             return response()->json(['message' => 'Cette commande est déjà sur une ardoise.'], 422);
         }
 
-        DB::transaction(function () use ($tab, $order) {
+        DB::transaction(function () use ($tab, $order, $request) {
             $tab->orders()->attach($order->id);
             $tab->recalculate();
+
+            // La commande passe en payée (dette) pour disparaître des commandes en cours
+            $order->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+                'cashier_id' => $request->user()->id,
+            ]);
+
+            // Libérer la table si elle était assignée
+            if ($order->table_id) {
+                \App\Models\Table::where('id', $order->table_id)->update([
+                    'status' => 'free',
+                    'occupied_since' => null,
+                    'assigned_user_id' => null,
+                ]);
+            }
+
+            // Déduire les stocks
+            \App\Jobs\ProcessStockDeduction::dispatch($order);
         });
 
         $tab->logActivity('order_attached', "Commande #{$order->order_number} ajoutée à l'ardoise");
@@ -128,6 +147,34 @@ class CustomerTabController extends Controller
         ]);
 
         DB::transaction(function () use ($tab, $request) {
+            $amountToDistribute = $request->amount;
+            $session = \App\Models\CashSession::where('restaurant_id', $request->user()->restaurant_id)
+                ->whereNull('closed_at')->latest()->first();
+
+            $orders = $tab->orders()->orderBy('created_at')->get();
+            foreach ($orders as $o) {
+                if ($amountToDistribute <= 0) break;
+                
+                $paidOnOrder = $o->payments()->sum('amount');
+                $remainingOnOrder = max(0, $o->total - $paidOnOrder);
+                
+                if ($remainingOnOrder > 0) {
+                    $apply = min($amountToDistribute, $remainingOnOrder);
+                    
+                    \App\Models\Payment::create([
+                        'order_id'        => $o->id,
+                        'cash_session_id' => $session?->id,
+                        'user_id'         => $request->user()->id,
+                        'amount'          => $apply,
+                        'method'          => $request->payment_method,
+                        'reference'       => $request->payment_reference,
+                        'is_partial'      => $apply < $remainingOnOrder,
+                    ]);
+                    
+                    $amountToDistribute -= $apply;
+                }
+            }
+
             $tab->increment('paid_amount', $request->amount);
             $tab->recalculate();
             $tab->refresh();
