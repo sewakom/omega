@@ -15,6 +15,7 @@ class Expense extends Model
         'restaurant_id', 'cash_session_id', 'user_id',
         'category', 'description', 'amount',
         'payment_method', 'receipt_ref', 'notes',
+        'beneficiary', 'agent_name'
     ];
 
     protected $casts = [

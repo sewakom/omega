@@ -38,6 +38,8 @@ class ExpenseController extends Controller
             'payment_method' => 'nullable|string',
             'receipt_ref'    => 'nullable|string|max:100',
             'notes'          => 'nullable|string',
+            'beneficiary'    => 'nullable|string|max:255',
+            'agent_name'     => 'nullable|string|max:255',
         ]);
 
         // Rattacher à la session de caisse courante
@@ -65,6 +67,8 @@ class ExpenseController extends Controller
             'payment_method'  => $request->payment_method ?: 'cash',
             'receipt_ref'     => $request->receipt_ref,
             'notes'           => $request->notes,
+            'beneficiary'     => $request->beneficiary,
+            'agent_name'      => $request->agent_name,
         ]);
 
         // Mettre à jour le total dépenses de la session
