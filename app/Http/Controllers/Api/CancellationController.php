@@ -33,7 +33,7 @@ class CancellationController extends Controller
             'notes' => $request->notes, 'status' => 'pending', 'requested_at' => now(),
         ]);
 
-        if ($request->user()->isManager()) {
+        if ($request->user()->hasRole(['admin', 'manager', 'cashier'])) {
             return $this->approve($request, $cancellation);
         }
 
@@ -45,10 +45,10 @@ class CancellationController extends Controller
         abort_if($cancellation->restaurant_id !== $request->user()->restaurant_id, 403);
         abort_if($cancellation->status !== 'pending', 422, 'Cette demande est déjà traitée.');
 
-        if (!$request->user()->isManager()) {
+        if (!$request->user()->hasRole(['admin', 'manager', 'cashier'])) {
             $request->validate(['manager_pin' => 'required|string']);
             $manager = \App\Models\User::where('restaurant_id', $request->user()->restaurant_id)
-                ->where('active', true)->whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'manager']))
+                ->where('active', true)->whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'manager', 'cashier']))
                 ->get()->first(fn($u) => Hash::check($request->manager_pin, $u->pin));
             abort_if(!$manager, 403, 'PIN manager incorrect.');
             $approverId = $manager->id;
@@ -76,7 +76,7 @@ class CancellationController extends Controller
     public function reject(Request $request, Cancellation $cancellation)
     {
         abort_if($cancellation->restaurant_id !== $request->user()->restaurant_id, 403);
-        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
+        abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Manager requis.');
         abort_if($cancellation->status !== 'pending', 422, 'Déjà traitée.');
         $request->validate(['reason' => 'required|string']);
         $cancellation->update(['status' => 'rejected', 'approved_by' => $request->user()->id, 'approved_at' => now(),
@@ -86,7 +86,7 @@ class CancellationController extends Controller
 
     public function index(Request $request)
     {
-        $cancellations = Cancellation::with(['requester:id,first_name,last_name', 'approver:id,first_name,last_name'])
+        $cancellations = Cancellation::with(['requester:id,first_name,last_name', 'approver:id,first_name,last_name', 'cancellable'])
             ->where('restaurant_id', $request->user()->restaurant_id)
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->from, fn($q) => $q->where('requested_at', '>=', $request->from))
