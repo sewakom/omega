@@ -36,7 +36,7 @@ class DailyReportService
             ->join('payments', 'payments.order_id', '=', 'orders.id')
             ->join('products', 'order_items.product_id', '=', 'products.id')
             ->where('payments.cash_session_id', $session->id)
-            ->select('products.name', DB::raw('SUM(order_items.quantity) as total_qty'), DB::raw('SUM(order_items.total) as total_amount'))
+            ->select('products.name', DB::raw('SUM(order_items.quantity) as total_qty'), DB::raw('SUM(order_items.subtotal) as total_amount'))
             ->groupBy('products.id', 'products.name')
             ->orderByDesc('total_qty')
             ->get();
