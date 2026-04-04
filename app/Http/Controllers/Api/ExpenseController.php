@@ -32,10 +32,10 @@ class ExpenseController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'category'       => 'required|in:food_supply,equipment,fuel,salary,maintenance,cleaning,other',
-            'description'    => 'required|string|max:255',
+            'category'       => 'required|string',
+            'description'    => 'nullable|string|max:255',
             'amount'         => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:cash,card,wave,orange_money,other',
+            'payment_method' => 'nullable|string',
             'receipt_ref'    => 'nullable|string|max:100',
             'notes'          => 'nullable|string',
         ]);
@@ -51,9 +51,9 @@ class ExpenseController extends Controller
             'cash_session_id' => $session?->id,
             'user_id'         => $request->user()->id,
             'category'        => $request->category,
-            'description'     => $request->description,
+            'description'     => $request->description ?: "Dépense {$request->category}",
             'amount'          => $request->amount,
-            'payment_method'  => $request->payment_method,
+            'payment_method'  => $request->payment_method ?: 'cash',
             'receipt_ref'     => $request->receipt_ref,
             'notes'           => $request->notes,
         ]);
