@@ -173,6 +173,6 @@ class ReceiptController extends Controller
             ->header('Content-Disposition', 'inline; filename="invoice-' . $order->order_number . '.pdf"');
     }
 
-    private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', default => 'Autre' }; }
+    private function methodLabel(string $method): string { return match($method) { 'cash' => 'Espèces', 'card' => 'Carte bancaire', 'wave' => 'Wave', 'orange_money' => 'Orange Money', 'momo' => 'Mobile Money', 'moov' => 'Moov Money', 'mixx' => 'Mixx', default => 'Autre' }; }
     private function typeLabel(string $type): string { return match($type) { 'dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'gozem' => 'Gozem', 'delivery' => 'Livraison', default => $type }; }
 }

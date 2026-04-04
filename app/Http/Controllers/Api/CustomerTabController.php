@@ -76,6 +76,7 @@ class CustomerTabController extends Controller
 
         $tab->load([
             'orders.items.product',
+            'orders.payments',
             'orders.table',
             'creator:id,first_name,last_name',
         ]);
@@ -141,7 +142,7 @@ class CustomerTabController extends Controller
 
         $request->validate([
             'amount'            => 'required|numeric|min:0.01',
-            'payment_method'    => 'required|in:cash,card,wave,orange_money,bank,other',
+            'payment_method'    => 'required|in:cash,card,wave,orange_money,momo,moov,mixx,bank,other',
             'payment_reference' => 'nullable|string|max:100',
             'notes'             => 'nullable|string',
         ]);
@@ -179,11 +180,12 @@ class CustomerTabController extends Controller
             $tab->recalculate();
             $tab->refresh();
 
-            $newStatus = $tab->paid_amount >= $tab->total_amount ? 'paid' : 'partially_paid';
+            // Les ardoises restent perpétuellement ouvertes pour ce client (compte client global)
+            $newStatus = 'open';
             $tab->update([
                 'status'  => $newStatus,
-                'paid_at' => $newStatus === 'paid' ? now() : null,
-                'closed_at' => $newStatus === 'paid' ? now() : null,
+                'paid_at' => $tab->paid_amount >= $tab->total_amount ? now() : null,
+                // 'closed_at' remains null
             ]);
         });
 
@@ -191,7 +193,7 @@ class CustomerTabController extends Controller
         $tab->logActivity('tab_payment', "Paiement de {$request->amount} FCFA ({$request->payment_method}) sur ardoise. Reste: {$remaining} FCFA");
 
         return response()->json([
-            'message'          => $tab->status === 'paid' ? 'Ardoise soldée !' : 'Paiement partiel enregistré.',
+            'message'          => $tab->remainingAmount() <= 0 ? 'Ardoise soldée ! (Le compte reste ouvert pour de futures commandes)' : 'Paiement partiel enregistré.',
             'tab'              => $tab->fresh(),
             'remaining_amount' => $remaining,
         ]);

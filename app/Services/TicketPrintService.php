@@ -951,17 +951,40 @@ class TicketPrintService
         $pdf->Cell(45, 10, 'TOTAL TTC', 0, 0, 'L', true);
         $pdf->Cell(35, 10, number_format($total, 0, '.', ' ') . ' FCFA', 0, 1, 'R', true);
         
-        $pdf->Ln(2);
-        $pdf->SetX(120);
-        $pdf->SetTextColor(0);
-        $pdf->Cell(45, 8, utf8_decode('Déjà payé'), 0, 0);
-        $pdf->Cell(35, 8, number_format($paid, 0, '.', ' '), 0, 1, 'R');
-        
         $pdf->SetX(120);
         $pdf->SetFont('Arial', 'B', 12);
         $pdf->SetTextColor(255, 0, 0);
         $pdf->Cell(45, 10, 'RESTE A PAYER', 0, 0);
         $pdf->Cell(35, 10, number_format($remaining, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        
+        $pdf->Ln(5);
+        $pdf->SetTextColor(0);
+        
+        // Bloc Historique Paiements
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->SetFillColor(240, 240, 240);
+        $pdf->Cell(0, 8, utf8_decode('  HISTORIQUE DES VERSEMENTS'), 0, 1, 'L', true);
+        $pdf->SetFont('Arial', '', 9);
+        
+        $tab->load('orders.payments');
+        $allPayments = $tab->orders->flatMap->payments->sortByDesc('created_at');
+        
+        if ($allPayments->isEmpty()) {
+            $pdf->Cell(0, 7, utf8_decode('Aucun versement enregistré.'), 0, 1, 'C');
+        } else {
+            foreach ($allPayments as $p) {
+                $dateP = $p->created_at->format('d/m/Y H:i');
+                $methodLabel = match($p->method) { 
+                    'cash' => 'ESPECES', 
+                    'momo' => 'MOBILE MONEY',
+                    'orange_money' => 'ORANGE MONEY',
+                    'wave' => 'WAVE',
+                    default => strtoupper($p->method) 
+                };
+                $pdf->Cell(60, 6, $dateP . ' - ' . $methodLabel, 0, 0);
+                $pdf->Cell(0, 6, number_format($p->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+            }
+        }
         
         // Footer aligné dynamiquement après les totaux
         $pdf->Ln(10);

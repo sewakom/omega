@@ -18,7 +18,7 @@ class PaymentController extends Controller
         $request->validate([
             'order_id'     => 'required|exists:orders,id',
             'amount'       => 'required|numeric|min:0.01',
-            'method'       => 'required|in:cash,card,wave,orange_money,momo,other',
+            'method'       => 'required|in:cash,card,wave,orange_money,momo,moov,mixx,other',
             'reference'    => 'nullable|string',
             'amount_given' => 'nullable|numeric|min:0',
         ]);
@@ -82,7 +82,7 @@ class PaymentController extends Controller
             'order_id'     => 'required|exists:orders,id',
             'payments'     => 'required|array|min:1',
             'payments.*.amount' => 'required|numeric|min:0.01',
-            'payments.*.method' => 'required|in:cash,card,wave,orange_money,momo,other',
+            'payments.*.method' => 'required|in:cash,card,wave,orange_money,momo,moov,mixx,other',
             'payments.*.reference' => 'nullable|string',
         ]);
 
