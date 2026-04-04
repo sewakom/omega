@@ -99,7 +99,7 @@ class CancellationController extends Controller
         $order->items()->update(['status' => 'cancelled']);
         $order->update(['status' => 'cancelled']);
         if ($order->table_id) $order->table->update(['status' => 'free', 'occupied_since' => null, 'assigned_user_id' => null]);
-        $order->logs()->create(['user_id' => $cancellation->approved_by, 'action' => 'cancelled', 'message' => "Commande annulée. Raison: {$cancellation->reason}", 'meta' => ['cancellation_id' => $cancellation->id]]);
+        $order->logActivity('cancelled', "Commande annulée. Raison: {$cancellation->reason}", ['cancellation_id' => $cancellation->id], $cancellation->approved_by);
     }
 
     private function cancelOrderItem(OrderItem $item, Cancellation $cancellation): void
@@ -108,7 +108,7 @@ class CancellationController extends Controller
         $order = $item->order;
         $order->recalculate();
         if ($order->items()->where('status', '!=', 'cancelled')->doesntExist()) $order->update(['status' => 'cancelled']);
-        $order->logs()->create(['user_id' => $cancellation->approved_by, 'action' => 'item_cancelled', 'message' => "{$item->product->name} x{$item->quantity} annulé. Raison: {$cancellation->reason}", 'meta' => ['cancellation_id' => $cancellation->id]]);
+        $order->logActivity('item_cancelled', "{$item->product->name} x{$item->quantity} annulé. Raison: {$cancellation->reason}", ['cancellation_id' => $cancellation->id], $cancellation->approved_by);
     }
 
     private function cancelPayment(Payment $payment, Cancellation $cancellation): void
@@ -116,7 +116,7 @@ class CancellationController extends Controller
         $payment->delete();
         $order = $payment->order;
         if ($order->status === 'paid') $order->update(['status' => 'served', 'paid_at' => null]);
-        $order->logs()->create(['user_id' => $cancellation->approved_by, 'action' => 'payment_cancelled', 'message' => "Paiement de {$payment->amount} FCFA annulé. Raison: {$cancellation->reason}", 'meta' => ['cancellation_id' => $cancellation->id]]);
+        $order->logActivity('payment_cancelled', "Paiement de {$payment->amount} FCFA annulé. Raison: {$cancellation->reason}", ['cancellation_id' => $cancellation->id], $cancellation->approved_by);
     }
 
     private function resolveSubject(string $type, int $id, $user)

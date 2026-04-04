@@ -96,13 +96,28 @@ class Order extends Model
     /**
      * Enregistrer une activité pour cette commande
      */
-    public function logActivity(string $action, string $message, array $meta = []): OrderLog
+    public function logActivity(string $action, string $message, array $meta = [], ?int $userId = null): OrderLog
     {
-        return $this->logs()->create([
-            'user_id' => \Illuminate\Support\Facades\Auth::id(),
+        $userId = $userId ?? \Illuminate\Support\Facades\Auth::id();
+        
+        $orderLog = $this->logs()->create([
+            'user_id' => $userId,
             'action'  => $action,
             'message' => $message,
             'meta'    => $meta,
         ]);
+
+        \App\Models\ActivityLog::create([
+            'restaurant_id' => $this->restaurant_id,
+            'user_id'       => $userId,
+            'action'        => $action,
+            'module'        => 'pos_order',
+            'subject_type'  => self::class,
+            'subject_id'    => $this->id,
+            'description'   => $message,
+            'ip_address'    => \Illuminate\Support\Facades\Request::ip() ?? '127.0.0.1',
+        ]);
+
+        return $orderLog;
     }
 }
