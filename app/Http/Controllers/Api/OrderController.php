@@ -309,6 +309,12 @@ class OrderController extends Controller
         $oldStatus = $order->status;
         $order->update(['status' => $request->status]);
 
+        if ($request->status === 'paid' || $request->status === 'served') {
+            $order->items()
+                ->whereNotIn('status', ['cancelled', 'served'])
+                ->update(['status' => 'served', 'served_at' => now()]);
+        }
+        
         if ($request->status === 'cancelled') {
             $order->logActivity('order_cancelled', "Commande {$order->order_number} annulée. Motif: {$request->reason}");
             // Si la table était occupée, on la libère si c'est la seule commande ouverte

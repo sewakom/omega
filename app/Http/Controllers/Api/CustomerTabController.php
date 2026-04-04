@@ -113,6 +113,11 @@ class CustomerTabController extends Controller
                 'cashier_id' => $request->user()->id,
             ]);
 
+            // Marquer tous les articles comme servis
+            $order->items()
+                ->whereNotIn('status', ['cancelled', 'served'])
+                ->update(['status' => 'served', 'served_at' => now()]);
+
             // Libérer la table si elle était assignée
             if ($order->table_id) {
                 \App\Models\Table::where('id', $order->table_id)->update([

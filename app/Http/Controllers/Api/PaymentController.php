@@ -64,6 +64,11 @@ class PaymentController extends Controller
                     ]);
                 }
 
+                // Marquer tous les articles comme servis puisque la commande est payée
+                $order->items()
+                    ->whereNotIn('status', ['cancelled', 'served'])
+                    ->update(['status' => 'served', 'served_at' => now()]);
+
                 ProcessStockDeduction::dispatch($order);
             }
 
