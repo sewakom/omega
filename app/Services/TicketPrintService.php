@@ -166,7 +166,13 @@ class TicketPrintService
             </div>";
         }
 
-        $tableLabel  = $order->table ? "Table {$order->table->number}" : ucfirst($order->type);
+        $typeLabel = match($order->type) {
+            'dine_in'  => 'Sur place',
+            'takeaway' => 'À emporter',
+            'gozem'    => 'Livraison (Gozem)',
+            default    => ucfirst($order->type),
+        };
+        $tableLabel  = $order->table ? "Table {$order->table->number}" : $typeLabel;
         $subtotal    = number_format((float) ($order->subtotal ?? 0), 0, ',', ' ');
         $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
         $vat         = number_format((float) ($order->vat_amount ?? 0), 0, ',', ' ');
@@ -434,7 +440,13 @@ class TicketPrintService
         $pdf->SetFont('Helvetica', 'B', 10);
         $pdf->Cell(90, 6, utf8_decode('DÉTAILS COMMANDE'), 'B', 1, 'L');
         $pdf->SetFont('Helvetica', '', 10);
-        $pdf->Cell(45, 6, 'Type:', 0, 0); $pdf->Cell(45, 6, strtoupper($order->type), 0, 1);
+        $typeLabel = match($order->type) {
+            'dine_in'  => 'Sur place',
+            'takeaway' => 'À emporter',
+            'gozem'    => 'Gozem',
+            default    => ucfirst($order->type),
+        };
+        $pdf->Cell(45, 6, 'Type:', 0, 0); $pdf->Cell(45, 6, utf8_decode(strtoupper($typeLabel)), 0, 1);
         if ($order->table) {
             $pdf->Cell(45, 6, 'Table:', 0, 0); $pdf->Cell(45, 6, $order->table->number, 0, 1);
         }
@@ -585,6 +597,98 @@ class TicketPrintService
         $pdf->Cell(0, 5, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance'), 0, 1, 'C');
         $pdf->SetFont('Helvetica', '', 8);
         $pdf->Cell(0, 4, utf8_decode($restaurant->name . ' — Document certifié par Omega POS'), 0, 1, 'C');
+
+        return $pdf->Output('S');
+    }
+
+    /**
+     * Ticket Cuisine/Bar/Pizza en format PDF 58/80mm SANS PRIX
+     */
+    public function generateKitchenTicketPdf(Order $order, string $destination = 'kitchen'): string
+    {
+        $order->loadMissing([
+            'items.product.category',
+            'table',
+            'waiter',
+        ]);
+
+        $filteredItems = $order->items->whereNotIn('status', ['cancelled']);
+        $allGroups = $this->routing->groupByDestination($filteredItems);
+        $items = $allGroups[$destination] ?? collect();
+
+        if ($items->isEmpty()) return '';
+
+        $pdf = new Fpdf('P', 'mm', array(80, 100 + ($items->count() * 15)));
+        $pdf->SetMargins(5, 5, 5);
+        $pdf->AddPage();
+        
+        // Entête Destination
+        $pdf->SetFont('Helvetica', 'B', 16);
+        $pdf->Cell(0, 8, utf8_decode($this->routing->destinationLabel($destination)), 0, 1, 'C');
+        $pdf->SetFont('Helvetica', 'B', 12);
+        $pdf->Cell(0, 6, "Ticket #" . $order->order_number, 0, 1, 'C');
+        
+        $pdf->SetFont('Helvetica', '', 9);
+        $pdf->Cell(0, 5, "Modifie le: " . now()->format('d/m/Y H:i'), 0, 1, 'C');
+        
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
+        
+        // Table or Type
+        $pdf->SetFont('Helvetica', 'B', 14);
+        if ($order->table instanceof \App\Models\Table) {
+            $pdf->Cell(0, 8, "TABLE " . $order->table->number, 1, 1, 'C');
+        } else {
+            $typeLabel = match($order->type) { 'dine_in' => 'Sur place', 'takeaway' => 'A emporter', 'gozem' => 'Livraison', default => ucfirst($order->type) };
+            $pdf->Cell(0, 8, strtoupper(utf8_decode($typeLabel)), 1, 1, 'C');
+        }
+        
+        $pdf->Ln(4);
+        
+        // Infos complémentaires
+        if ($order->waiter) {
+            $pdf->SetFont('Helvetica', '', 10);
+            $pdf->Cell(0, 5, "Serveur: " . utf8_decode($order->waiter->first_name), 0, 1, 'L');
+        }
+        if ($order->customer_name && $order->type === 'gozem') {
+            $pdf->SetFont('Helvetica', '', 10);
+            $pdf->Cell(0, 5, "Client: " . utf8_decode($order->customer_name), 0, 1, 'L');
+            $pdf->Cell(0, 5, "Tel: " . $order->customer_phone, 0, 1, 'L');
+        }
+        
+        if ($order->notes) {
+            $pdf->SetFont('Helvetica', 'B', 10);
+            $pdf->MultiCell(0, 6, utf8_decode("Note Cmd: " . $order->notes), 1, 'L');
+        }
+        
+        $pdf->Ln(2);
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
+        $pdf->Ln(2);
+
+        // Liste des articles
+        $pdf->SetFont('Helvetica', 'B', 14);
+        foreach ($items as $item) {
+            $x = $pdf->GetX();
+            $y = $pdf->GetY();
+            
+            $pdf->Cell(12, 6, "x" . $item->quantity, 0, 0, 'L');
+            
+            // On gère un passage à la ligne possible avec MultiCell (donc on sauve le X/Y)
+            $pdf->MultiCell(58, 6, utf8_decode(strtoupper($item->product->name)), 0, 'L');
+            
+            if ($item->notes) {
+                // S'il y a une note d'article
+                $pdf->SetFont('Helvetica', 'I', 11);
+                $pdf->SetX($x + 12);
+                $pdf->MultiCell(58, 5, utf8_decode("! " . $item->notes), 0, 'L');
+                $pdf->SetFont('Helvetica', 'B', 14);
+            }
+            $pdf->Ln(3);
+        }
+        
+        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
+        $pdf->Ln(3);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(0, 4, "*** FIN DU BON ***", 0, 1, 'C');
 
         return $pdf->Output('S');
     }

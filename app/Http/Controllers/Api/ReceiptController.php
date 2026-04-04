@@ -123,27 +123,20 @@ class ReceiptController extends Controller
         abort_unless(in_array($destination, ['kitchen', 'bar', 'pizza', 'all']), 422, 'Destination invalide.');
 
         if ($destination === 'all') {
-            $fullHtml = '';
-            foreach (['kitchen', 'bar', 'pizza'] as $dest) {
-                $html = $this->ticketService->kitchenTicketHtml($order, $dest);
-                if ($html) {
-                    // Wrap with a page break for the thermal printer
-                    $fullHtml .= $html . '<div style="page-break-after: always; margin: 20px 0; border-bottom: 2px dashed #000;"></div>';
-                }
-            }
-            if (!$fullHtml) {
-                return response()->json(['message' => "Aucun item pour ces destinations."], 404);
-            }
-            return response($fullHtml)->header('Content-Type', 'text/html');
+            // Simplification: le frontend passe maintenant les destinations de façon spécifique via le Modal de Cuisine.
+            // S'il retombe sur 'all', on génère par défaut la cuisine.
+            $destination = 'kitchen';
         }
 
-        $html = $this->ticketService->kitchenTicketHtml($order, $destination);
+        $pdfContent = $this->ticketService->generateKitchenTicketPdf($order, $destination);
 
-        if (!$html) {
+        if (!$pdfContent) {
             return response()->json(['message' => "Aucun item pour '{$destination}'."], 404);
         }
 
-        return response($html)->header('Content-Type', 'text/html');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="kitchen-' . $destination . '-' . $order->order_number . '.pdf"');
     }
 
     /**
