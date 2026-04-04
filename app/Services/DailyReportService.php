@@ -4,181 +4,194 @@ namespace App\Services;
 
 use App\Models\CashSession;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Expense;
+use App\Models\Payment;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 
 /**
  * DailyReportService
- * Génère le rapport journalier HTML (format A4) et l'envoie par email au boss.
+ * Génère le rapport journalier HTML ultra-professionnel (format A4) et l'envoie par email au boss.
  */
 class DailyReportService
 {
     /**
-     * Génère le HTML du rapport A4 de clôture de session
+     * Génère le HTML du rapport A4 de clôture de session (Version PRO)
      */
     public function generateSessionReportHtml(CashSession $session): string
     {
         $session->loadMissing(['user', 'restaurant']);
         $restaurant = $session->restaurant;
 
-        // Totaux par méthode
-        $payments = \App\Models\Payment::where('cash_session_id', $session->id)
+        // 1. Totaux par méthode de paiement
+        $payments = Payment::where('cash_session_id', $session->id)
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')
             ->groupBy('method')
             ->get();
 
-        // Commandes de la session
-        $orders = Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))
-            ->with('table')
+        // 2. Statistiques des produits vendus (Performance)
+        $productStats = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('payments.cash_session_id', $session->id)
+            ->select('products.name', DB::raw('SUM(order_items.quantity) as total_qty'), DB::raw('SUM(order_items.total) as total_amount'))
+            ->groupBy('products.id', 'products.name')
+            ->orderByDesc('total_qty')
             ->get();
 
-        $ordersCount  = $orders->count();
+        // 3. Commandes
+        $orders = Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))->get();
         $totalRevenue = $orders->sum('total');
 
-        // Dépenses de la session
+        // 4. Dépenses
         $expenses = Expense::where('cash_session_id', $session->id)->get();
         $totalExpenses = $expenses->sum('amount');
 
-        // Commandes Gâteaux (Acomptes encaissés durant cette session)
-        $cakePayments = \App\Models\CakeOrder::where('cash_session_id', $session->id)->get();
-        $totalCakes = $cakePayments->sum(function($c) use ($session) {
-            // Si la commande a été créée ET payée dans la même session, on prend 'advance_paid' (qui est le total)
-            // C'est un peu approximatif sans table de paiement séparée, mais ça donne une idée.
-            return $c->advance_paid;
-        });
-
-        // Par type de commande
-        $byType = $orders->groupBy('type')->map(fn($g) => [
-            'count' => $g->count(),
-            'total' => $g->sum('total'),
-        ]);
-
+        // 5. Préparation des éléments HTML
         $paymentsHtml = '';
         foreach ($payments as $p) {
-            $method = strtoupper($p->method);
+            $methodMapping = ['cash' => 'ESPÈCES', 'card' => 'CARTE BANCAIRE', 'wave' => 'WAVE', 'orange_money' => 'ORANGE MONEY', 'momo' => 'MTN MOMO'];
+            $method = $methodMapping[$p->method] ?? strtoupper($p->method);
             $total  = number_format($p->total, 0, ',', ' ');
-            $paymentsHtml .= "<tr><td>{$method}</td><td>{$p->count}</td><td style='text-align:right'><strong>{$total} FCFA</strong></td></tr>";
+            $paymentsHtml .= "<tr>
+                <td style='padding: 10px; border-bottom: 1px solid #eee;'>{$method}</td>
+                <td style='padding: 10px; border-bottom: 1px solid #eee; text-align:center;'>{$p->count}</td>
+                <td style='padding: 10px; border-bottom: 1px solid #eee; text-align:right;'><strong>{$total} FCFA</strong></td>
+            </tr>";
+        }
+
+        $productsHtml = '';
+        foreach ($productStats as $stat) {
+            $amt = number_format($stat->total_amount, 0, ',', ' ');
+            $productsHtml .= "<tr>
+                <td style='padding: 8px; border-bottom: 1px solid #f9f9f9;'>{$stat->name}</td>
+                <td style='padding: 8px; border-bottom: 1px solid #f9f9f9; text-align:center;'>{$stat->total_qty}</td>
+                <td style='padding: 8px; border-bottom: 1px solid #f9f9f9; text-align:right;'>{$amt} FCFA</td>
+            </tr>";
         }
 
         $expensesHtml = '';
-        foreach ($expenses as $e) {
-            $amt = number_format($e->amount, 0, ',', ' ');
-            $expensesHtml .= "<tr><td>{$e->description}</td><td>{$e->category}</td><td style='text-align:right'>{$amt} FCFA</td></tr>";
+        if ($expenses->isEmpty()) {
+            $expensesHtml = "<tr><td colspan='3' style='padding: 20px; text-align:center; color: #999; font-style: italic;'>Aucune dépense enregistrée</td></tr>";
+        } else {
+            foreach ($expenses as $e) {
+                $amt = number_format($e->amount, 0, ',', ' ');
+                $expensesHtml .= "<tr>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->description}</td>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->category}</td>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee; text-align:right; color: #e11d48;'>-{$amt} FCFA</td>
+                </tr>";
+            }
         }
 
-        $typeHtml = '';
-        $typeLabels = ['dine_in' => 'Sur place', 'takeaway' => 'À emporter', 'gozem' => 'Gozem'];
-        foreach ($byType as $type => $data) {
-            $label = $typeLabels[$type] ?? $type;
-            $total = number_format($data['total'], 0, ',', ' ');
-            $typeHtml .= "<tr><td>{$label}</td><td>{$data['count']}</td><td style='text-align:right'>{$total} FCFA</td></tr>";
-        }
+        $netEncaisse = $totalRevenue - $totalExpenses;
+        $diffColor = ($session->difference ?? 0) >= 0 ? '#10b981' : '#e11d48';
 
-        $totalRevenueF  = number_format($totalRevenue + $totalCakes, 0, ',', ' ');
-        $totalExpensesF = number_format($totalExpenses, 0, ',', ' ');
-        $netF           = number_format(($totalRevenue + $totalCakes) - $totalExpenses, 0, ',', ' ');
-        $openAmount     = number_format($session->opening_amount, 0, ',', ' ');
-        $closeAmount    = number_format($session->closing_amount ?? 0, 0, ',', ' ');
-        $expectedF      = number_format($session->expected_amount ?? 0, 0, ',', ' ');
-        $diffF          = number_format($session->difference ?? 0, 0, ',', ' ');
-        $diffColor      = ($session->difference ?? 0) >= 0 ? 'green' : 'red';
+        // URL pour le PDF (exemple)
+        $pdfUrl = config('app.url') . "/cash-sessions/{$session->id}/report-preview";
 
-        $openedAt  = $session->opened_at?->format('d/m/Y H:i') ?? '-';
-        $closedAt  = $session->closed_at?->format('d/m/Y H:i') ?? 'En cours';
-        $caissier  = $session->user->first_name . ' ' . $session->user->last_name;
-        $date      = $session->opened_at?->format('d/m/Y') ?? now()->format('d/m/Y');
-
-        return "<!DOCTYPE html>
-<html>
+        return "
+<!DOCTYPE html>
+<html lang='fr'>
 <head>
-<meta charset='UTF-8'>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 15mm; }
-  h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; }
-  h2 { font-size: 14px; color: #16213e; margin: 16px 0 8px; border-bottom: 2px solid #1a1a2e; padding-bottom: 4px; }
-  .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-  .badge { display: inline-block; background: #1a1a2e; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-  th { background: #1a1a2e; color: white; padding: 8px; text-align: left; font-size: 11px; }
-  td { padding: 6px 8px; border-bottom: 1px solid #eee; }
-  .summary-box { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-  .box { background: #f8f9fa; border-left: 4px solid #1a1a2e; padding: 12px; border-radius: 4px; }
-  .box .label { font-size: 10px; color: #666; text-transform: uppercase; }
-  .box .value { font-size: 18px; font-weight: bold; color: #1a1a2e; }
-  .footer { text-align: center; margin-top: 30px; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 8px; }
-  @media print { @page { size: A4; margin: 15mm; } }
-</style>
+    <meta charset='UTF-8'>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #334155; line-height: 1.5; margin: 0; padding: 0; background-color: #f8fafc; }
+        .container { max-width: 800px; margin: 20px auto; background: #fff; padding: 40px; border-radius: 8px; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .header { border-bottom: 4px solid #f97316; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        .logo-box h1 { margin: 0; color: #0f172a; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: -1px; }
+        .session-info { text-align: right; font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #f1f5f9; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; }
+        .stat-card.primary { background: #fff7ed; border-color: #ffedd5; }
+        .stat-label { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+        .stat-value { font-size: 22px; font-weight: 900; color: #0f172a; }
+        .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #1e293b; margin: 40px 0 15px; border-left: 4px solid #f97316; padding-left: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { text-align: left; padding: 12px 10px; background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 10px; font-weight: 800; }
+        .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; }
+        .download-btn { display: inline-block; background: #f97316; color: #fff; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: 800; font-size: 13px; text-transform: uppercase; margin-top: 20px; box-shadow: 0 10px 15px -3px rgba(249, 115, 22, 0.3); }
+    </style>
 </head>
 <body>
-  <div class='header'>
-    <div>
-      <h1>{$restaurant->name}</h1>
-      <div>Rapport de caisse — {$date}</div>
-      <div>Caissier: {$caissier}</div>
-      <div>Ouverte: {$openedAt} | Fermée: {$closedAt}</div>
+    <div class='container'>
+        <div class='header'>
+            <div class='logo-box'>
+                <h1 style='color: #f97316;'>SMARTFLOW <span style='color: #0f172a;'>POS</span></h1>
+                <p style='margin: 5px 0 0; font-size: 12px; font-weight: bold; color: #64748b;'>RAPPORT DE CLÔTURE DE CAISSE</p>
+            </div>
+            <div class='session-info'>
+                Date: {$session->opened_at->format('d/m/Y')}<br>
+                Session #{$session->id}<br>
+                Caissier: " . strtoupper($session->user->first_name) . "
+            </div>
+        </div>
+
+        <div class='summary-grid'>
+            <div class='stat-card primary'>
+                <div class='stat-label'>Ventes Totales</div>
+                <div class='stat-value'>" . number_format($totalRevenue, 0, ',', ' ') . " FCFA</div>
+            </div>
+            <div class='stat-card'>
+                <div class='stat-label'>Dépenses</div>
+                <div class='stat-value' style='color: #e11d48;'>-" . number_format($totalExpenses, 0, ',', ' ') . " FCFA</div>
+            </div>
+            <div class='stat-card'>
+                <div class='stat-label'>Net de Session</div>
+                <div class='stat-value' style='color: #10b981;'>" . number_format($netEncaisse, 0, ',', ' ') . " FCFA</div>
+            </div>
+        </div>
+
+        <div class='section-title'>Détail des Encaissements</div>
+        <table>
+            <thead><tr><th>Mode de Paiement</th><th style='text-align:center;'>Transactions</th><th style='text-align:right;'>Total HT</th></tr></thead>
+            <tbody>{$paymentsHtml}</tbody>
+        </table>
+
+        <div class='section-title'>Analyse des Ventes (Top Produits)</div>
+        <table>
+            <thead><tr><th>Désignation</th><th style='text-align:center;'>Qté</th><th style='text-align:right;'>Total</th></tr></thead>
+            <tbody>{$productsHtml}</tbody>
+        </table>
+
+        <div class='section-title'>Journal des Dépenses</div>
+        <table>
+            <thead><tr><th>Motif</th><th>Catégorie</th><th style='text-align:right;'>Montant</th></tr></thead>
+            <tbody>{$expensesHtml}</tbody>
+        </table>
+
+        <div class='section-title'>Rapprochement de Caisse</div>
+        <div style='background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px dashed #cbd5e1;'>
+            <table style='font-size: 14px;'>
+                <tr><td style='padding: 8px 0; color: #64748b;'>Fond d'ouverture :</td><td style='text-align:right; font-weight: bold;'>" . number_format($session->opening_amount, 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b;'>Attendu en caisse (Espèces) :</td><td style='text-align:right; font-weight: bold;'>" . number_format($session->expected_amount, 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b;'>Réel compté par le caissier :</td><td style='text-align:right; font-weight: bold; color: #0f172a;'>" . number_format($session->closing_amount ?? 0, 0, ',', ' ') . " FCFA</td></tr>
+                <tr style='border-top: 2px solid #e2e8f0;'><td style='padding: 15px 0 0; font-weight: 900; color: #0f172a; text-transform: uppercase;'>Écart de Caisse :</td><td style='padding: 15px 0 0; text-align:right; font-weight: 900; font-size: 18px; color: {$diffColor};'>" . number_format($session->difference ?? 0, 0, ',', ' ') . " FCFA</td></tr>
+            </table>
+            " . ($session->closing_notes ? "<div style='margin-top: 20px; font-size: 11px; padding: 10px; background: #fff; border-radius: 6px; color: #64748b;'><strong>Note:</strong> {$session->closing_notes}</div>" : "") . "
+        </div>
+
+        <div class='footer'>
+            <p style='font-size: 14px; font-weight: bold; color: #0f172a; margin-bottom: 5px;'>Besoin d'archiver ce document ?</p>
+            <p style='color: #64748b; font-size: 12px; margin-bottom: 25px;'>Cliquez sur le bouton ci-dessous pour générer et télécharger la version PDF complète de ce rapport de caisse.</p>
+            <a href='{$pdfUrl}' target='_blank' class='download-btn'>📥 Télécharger le Rapport PDF</a>
+            <p style='margin-top: 40px; font-size: 10px; color: #94a3b8;'>Document généré par SmartFlow POS — " . date('d/m/Y H:i') . "</p>
+        </div>
     </div>
-    <div style='text-align:right'>
-      <span class='badge'>RAPPORT OFFICIEL</span>
-    </div>
-  </div>
-
-  <div class='summary-box'>
-    <div class='box'>
-      <div class='label'>Total Ventes</div>
-      <div class='value'>{$totalRevenueF} FCFA</div>
-    </div>
-    <div class='box'>
-      <div class='label'>Total Dépenses</div>
-      <div class='value'>{$totalExpensesF} FCFA</div>
-    </div>
-    <div class='box'>
-      <div class='label'>Net Encaissé</div>
-      <div class='value'>{$netF} FCFA</div>
-    </div>
-  </div>
-
-  <h2>Paiements par méthode</h2>
-  <table>
-    <thead><tr><th>Mode</th><th>Nb transactions</th><th>Total</th></tr></thead>
-    <tbody>{$paymentsHtml}</tbody>
-  </table>
-
-  <h2>Commandes par type</h2>
-  <table>
-    <thead><tr><th>Type</th><th>Nb commandes</th><th>Total</th></tr></thead>
-    <tbody>{$typeHtml}</tbody>
-  </table>
-
-  <h2>Dépenses de la session</h2>
-  " . ($expensesHtml ? "
-  <table>
-    <thead><tr><th>Description</th><th>Catégorie</th><th>Montant</th></tr></thead>
-    <tbody>{$expensesHtml}</tbody>
-  </table>" : "<p style='color:#999'>Aucune dépense enregistrée.</p>") . "
-
-  <h2>Clôture de caisse</h2>
-  <table>
-    <tr><td>Fond d'ouverture</td><td style='text-align:right'>{$openAmount} FCFA</td></tr>
-    <tr><td>Montant attendu</td><td style='text-align:right'>{$expectedF} FCFA</td></tr>
-    <tr><td>Montant compté</td><td style='text-align:right'>{$closeAmount} FCFA</td></tr>
-    <tr><td><strong>Écart</strong></td><td style='text-align:right;color:{$diffColor}'><strong>{$diffF} FCFA</strong></td></tr>
-  </table>
-
-  <div class='footer'>
-    Rapport généré automatiquement le " . now()->format('d/m/Y à H:i') . " — {$restaurant->name}
-  </div>
 </body>
 </html>";
     }
 
     /**
-     * Envoie le rapport par email au boss
+     * Envoie le rapport par email au boss (Email de luxe)
      */
     public function sendReportByEmail(CashSession $session, string $toEmail): bool
     {
         try {
-            $html     = $this->generateSessionReportHtml($session);
-            $subject  = "Rapport de caisse — {$session->restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? now()->format('d/m/Y'));
+            $html = $this->generateSessionReportHtml($session);
+            $subject = "📊 RAPPORT DE CAISSE — {$session->restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
 
             Mail::html($html, function ($message) use ($toEmail, $subject) {
                 $message->to($toEmail)
