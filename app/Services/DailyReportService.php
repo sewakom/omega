@@ -89,8 +89,8 @@ class DailyReportService
         $netEncaisse = $totalRevenue - $totalExpenses;
         $diffColor = ($session->difference ?? 0) >= 0 ? '#10b981' : '#e11d48';
 
-        // URL pour le PDF (exemple)
-        $pdfUrl = config('app.url') . "/cash-sessions/{$session->id}/report-preview";
+        // URL pour le PDF (via API car la route est protégée)
+        $pdfUrl = config('app.url') . "/api/cash-sessions/{$session->id}/report-preview";
 
         return "
 <!DOCTYPE html>
