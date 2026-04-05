@@ -21,6 +21,13 @@ class DeliveryController extends Controller
         return response()->json($deliveries);
     }
 
+    public function show(Request $request, Delivery $delivery)
+    {
+        abort_if($delivery->restaurant_id !== $request->user()->restaurant_id, 403);
+        $delivery->load(['order.items.product', 'driver:id,first_name,last_name']);
+        return response()->json($delivery);
+    }
+
     public function store(Request $request)
     {
         $request->validate([
