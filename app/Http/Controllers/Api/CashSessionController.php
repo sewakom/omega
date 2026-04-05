@@ -68,7 +68,7 @@ class CashSessionController extends Controller
     {
         abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
         abort_if((bool) $session->closed_at, 422, 'Session déjà fermée.');
-        abort_unless($request->user()->isManager(), 403, 'Manager requis pour fermer la caisse.');
+        abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Permission requise pour fermer la caisse.');
 
         $request->validate([
             'closing_amount' => 'required|numeric|min:0',
@@ -123,7 +123,7 @@ class CashSessionController extends Controller
     public function sendReport(Request $request, CashSession $session)
     {
         abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
-        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
+        abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Permission requise.');
 
         $request->validate(['email' => 'required|email']);
 
