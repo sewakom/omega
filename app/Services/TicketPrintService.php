@@ -738,7 +738,14 @@ class TicketPrintService
         }
         
         $pdf->Cell(40, 4, 'Type', 0, 0);
-        $pdf->Cell(30, 4, strtoupper($order->type), 0, 1, 'R');
+        $typeLabel = match($order->type) {
+            'dine_in'  => 'SUR PLACE',
+            'takeaway' => 'A EMPORTER',
+            'gozem'    => 'LIVRAISON (GOZEM)',
+            'delivery' => 'LIVRAISON',
+            default    => strtoupper($order->type)
+        };
+        $pdf->Cell(30, 4, utf8_decode($typeLabel), 0, 1, 'R');
 
         if ($order->waiter) {
             $pdf->Cell(40, 4, 'Serveur', 0, 0);
