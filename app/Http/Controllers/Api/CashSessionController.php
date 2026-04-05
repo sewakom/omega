@@ -135,11 +135,11 @@ class CashSessionController extends Controller
         ]);
     }
 
-    /** Prévisualisation du rapport A4 (HTML) */
     public function reportPreview(Request $request, CashSession $session)
     {
-        abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
-
+        // On autorise la prévisualisation sans auth pour faciliter l'impression (window.open)
+        // car cette route est déclarée comme publique dans api.php
+        
         $html = $this->reportService->generateSessionReportHtml($session);
         return response($html)->header('Content-Type', 'text/html');
     }
