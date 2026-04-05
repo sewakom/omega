@@ -100,15 +100,35 @@ class ReportController extends Controller
         $pendingRevenue = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->sum('total');
         $activeOrders = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->count();
 
+        // Ventes horaires pour le graphique
+        $hourlySales = Order::where('restaurant_id', $restaurantId)
+            ->where('status', 'paid')
+            ->whereDate('paid_at', $today)
+            ->selectRaw('HOUR(paid_at) as hour, SUM(total) as revenue')
+            ->groupBy('hour')
+            ->orderBy('hour')
+            ->get()
+            ->keyBy('hour');
+
+        // Formater pour toutes les heures de service (ex: 8h à 23h)
+        $chartData = [];
+        for ($i = 8; $i <= 23; $i++) {
+            $chartData[] = [
+                'hour' => $i,
+                'revenue' => (float) ($hourlySales[$i]->revenue ?? 0)
+            ];
+        }
+
         return response()->json([
-            'revenue_today' => round($revenueToday, 2), 
+            'revenue_today'   => round($revenueToday, 2), 
             'pending_revenue' => round($pendingRevenue, 2),
-            'orders_today' => $ordersToday,
-            'active_orders' => $activeOrders,
-            'covers_today' => $coversToday, 
-            'avg_ticket' => round($avgTicket, 2),
-            'growth_percent' => round($growth, 1), 
-            'tables' => $tablesStats,
+            'orders_today'    => $ordersToday,
+            'active_orders'   => $activeOrders,
+            'covers_today'    => $coversToday, 
+            'avg_ticket'      => round($avgTicket, 2),
+            'growth_percent'  => round($growth, 1), 
+            'tables'          => $tablesStats,
+            'hourly_sales'    => $chartData,
         ]);
     }
 }
