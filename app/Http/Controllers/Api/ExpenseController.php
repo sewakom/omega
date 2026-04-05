@@ -119,100 +119,108 @@ class ExpenseController extends Controller
     }
 
     /**
-     * Reçu de dépense format PDF/HTML avec FILIGRANE
+     * Reçu de dépense format PDF VÉRITABLE (DomPDF) avec FILIGRANE
      */
     public function receipt(Expense $expense)
     {
         $expense->load(['user', 'restaurant', 'cashSession']);
-        $restaurantName = $expense->restaurant->name ?? 'RESTAURANT';
+        $restaurantName = $expense->restaurant->name ?? 'SMARTFLOW POS';
 
         $html = "
         <!DOCTYPE html>
-        <html lang='fr'>
+        <html>
         <head>
-            <meta charset='UTF-8'>
+            <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-                body { font-family: 'Inter', sans-serif; background: #f4f6f9; color: #1e293b; margin: 0; padding: 40px; }
-                .receipt { 
-                    max-width: 800px; margin: 0 auto; background: white; padding: 60px; 
-                    border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); 
-                    position: relative; overflow: hidden;
-                }
-                /* FILIGRANE */
-                .watermark {
-                    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
-                    font-size: 80px; font-weight: 900; color: rgba(0,0,0,0.05); white-space: nowrap;
-                    pointer-events: none; z-index: 0; text-transform: uppercase; letter-spacing: 0.1em;
-                }
-                .header { border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; margin-bottom: 40px; position: relative; z-index: 1; }
-                .title { font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; color: #f97316; }
-                .ref { font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-top: 5px; }
+                @page { margin: 0; }
+                body { font-family: Helvetica, sans-serif; background: #fff; color: #1e293b; margin: 0; padding: 0; }
+                .container { padding: 40px; position: relative; }
                 
-                .grid { display: grid; grid-template-cols: 1fr 1fr; gap: 40px; position: relative; z-index: 1; }
-                .item-label { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.1em; margin-bottom: 8px; }
-                .item-value { font-size: 16px; font-weight: 700; color: #1e293b; }
-                
-                .amount-box { 
-                    margin-top: 50px; padding: 30px; background: #0f172a; border-radius: 15px; 
-                    text-align: center; color: white; position: relative; z-index: 1;
+                /* FILIGRANE PDF */
+                #watermark {
+                    position: fixed; top: 35%; left: -30px; transform: rotate(-35deg);
+                    font-size: 80px; font-weight: bold; color: #f1f5f9;
+                    z-index: -1000; text-transform: uppercase; width: 100%; text-align: center;
                 }
-                .amount-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 10px; letter-spacing: 0.2em; }
-                .amount-value { font-size: 42px; font-weight: 900; color: #f97316; letter-spacing: -0.01em; }
-                
-                .footer { margin-top: 60px; padding-top: 30px; border-top: 1px solid #f1f5f9; font-size: 10px; color: #94a3b8; text-align: center; position: relative; z-index: 1; }
-                .signature-boxes { display: grid; grid-template-cols: 1fr 1fr; gap: 40px; margin-top: 40px; position: relative; z-index: 1; }
-                .sig-box { border: 1px dashed #e2e8f0; height: 100px; border-radius: 10px; position: relative; }
-                .sig-label { position: absolute; bottom: 10px; left: 0; width: 100%; text-align: center; font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
+
+                .header { border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 30px; }
+                .title { font-size: 26px; font-weight: bold; color: #f97316; }
+                .ref { font-size: 10px; color: #64748b; margin-top: 5px; text-transform: uppercase; }
+
+                .table-info { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                .table-info td { padding: 15px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+                .label { font-size: 9px; font-weight: bold; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+                .value { font-size: 14px; color: #1e293b; font-weight: bold; }
+
+                .amount-container { margin-top: 40px; padding: 30px; background: #0f172a; border-radius: 12px; text-align: center; }
+                .amount-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; margin-bottom: 10px; }
+                .amount-value { color: #f97316; font-size: 38px; font-weight: bold; }
+
+                .signature-section { margin-top: 60px; width: 100%; }
+                .sig-box { width: 45%; border-top: 1px dashed #cbd5e1; padding-top: 10px; text-align: center; }
+                .sig-name { font-size: 9px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+
+                .footer { position: fixed; bottom: 40px; width: 100%; text-align: center; font-size: 9px; color: #94a3b8; }
             </style>
         </head>
         <body>
-            <div class='receipt'>
-                <div class='watermark'>{$restaurantName}</div>
-                
+            <div id='watermark'>{$restaurantName}</div>
+            
+            <div class='container'>
                 <div class='header'>
                     <div class='title'>Justificatif de Sortie de Caisse</div>
                     <div class='ref'>Référence : EXP-" . str_pad($expense->id, 6, '0', STR_PAD_LEFT) . " • Émis le " . $expense->created_at->format('d/m/Y à H:i') . "</div>
                 </div>
 
-                <div class='grid'>
-                    <div>
-                        <div class='item-label'>Agent ayant perçu les fonds</div>
-                        <div class='item-value'>" . ($expense->agent_name ?: 'Non spécifié') . "</div>
-                    </div>
-                    <div>
-                        <div class='item-label'>Bénéficiaire / Fournisseur</div>
-                        <div class='item-value'>" . ($expense->beneficiary ?: 'Non spécifié') . "</div>
-                    </div>
-                    <div style='margin-top: 20px;'>
-                        <div class='item-label'>Motif de la dépense</div>
-                        <div class='item-value'>" . ($expense->description ?: 'Aucun motif') . "</div>
-                    </div>
-                    <div style='margin-top: 20px;'>
-                        <div class='item-label'>Catégorie comptable</div>
-                        <div class='item-value' style='text-transform: uppercase;'>" . $expense->category . "</div>
-                    </div>
-                </div>
+                <table class='table-info'>
+                    <tr>
+                        <td width='50%'>
+                            <div class='label'>Agent ayant perçu les fonds</div>
+                            <div class='value'>" . ($expense->agent_name ?: 'Non spécifié') . "</div>
+                        </td>
+                        <td width='50%'>
+                            <div class='label'>Bénéficiaire / Fournisseur</div>
+                            <div class='value'>" . ($expense->beneficiary ?: 'Non spécifié') . "</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class='label'>Motif de la dépense</div>
+                            <div class='value'>" . ($expense->description ?: 'Aucun motif') . "</div>
+                        </td>
+                        <td>
+                            <div class='label'>Catégorie comptable</div>
+                            <div class='value' style='text-transform: uppercase;'>" . $expense->category . "</div>
+                        </td>
+                    </tr>
+                </table>
 
-                <div class='amount-box'>
+                <div class='amount-container'>
                     <div class='amount-label'>Montant Total Décaissé</div>
                     <div class='amount-value'>" . number_format($expense->amount, 0, ',', ' ') . " FCFA</div>
                 </div>
 
-                <div class='signature-boxes'>
-                    <div class='sig-box'><div class='sig-label'>Signature Agent</div></div>
-                    <div class='sig-box'><div class='sig-label'>Validation BOSS / Manager</div></div>
-                </div>
+                <table class='signature-section' style='margin-top: 80px;'>
+                    <tr>
+                        <td class='sig-box'>
+                            <div class='sig-name'>Signature de l'Agent</div>
+                        </td>
+                        <td width='10%'></td>
+                        <td class='sig-box'>
+                            <div class='sig-name'>Validation BOSS / Manager</div>
+                        </td>
+                    </tr>
+                </table>
 
                 <div class='footer'>
-                    Ce document fait office de pièce comptable pour les justificatifs de caisse de " . $restaurantName . ".<br>
-                    ID Session : #" . ($expense->cash_session_id ?: 'N/A') . " • Utilisateur : " . $expense->user->first_name . "
+                    Ce document fait office de pièce comptable pour " . $restaurantName . ".<br>
+                    ID Caisse : #" . ($expense->cash_session_id ?? 'N/A') . " • Établi par : " . ($expense->user->first_name ?? 'Inconnu') . "
                 </div>
             </div>
-            <script>window.onload = function() { window.print(); }</script>
         </body>
         </html>";
 
-        return response($html)->header('Content-Type', 'text/html');
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+        return $pdf->download("Recu_Depense_EXP_" . $expense->id . ".pdf");
     }
 }
