@@ -101,11 +101,21 @@ class CancellationController extends Controller
 
     public function index(Request $request)
     {
-        $cancellations = Cancellation::with(['requester:id,first_name,last_name', 'approver:id,first_name,last_name', 'cancellable'])
+        $cancellations = Cancellation::with([
+            'requester:id,first_name,last_name',
+            'approver:id,first_name,last_name',
+            'cancellable' => function($morph) {
+                 $morph->morphWith([
+                     OrderItem::class => ['order:id,order_number'],
+                     Payment::class => ['order:id,order_number']
+                 ]);
+            }
+        ])
             ->where('restaurant_id', $request->user()->restaurant_id)
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->from, fn($q) => $q->where('requested_at', '>=', $request->from))
             ->latest('requested_at')->paginate(30);
+
         return response()->json($cancellations);
     }
 
@@ -123,7 +133,7 @@ class CancellationController extends Controller
         $order = $item->order;
         $order->recalculate();
         if ($order->items()->where('status', '!=', 'cancelled')->doesntExist()) $order->update(['status' => 'cancelled']);
-        $order->logActivity('item_cancelled', "{$item->product->name} x{$item->quantity} annulé. Raison: {$cancellation->reason}", ['cancellation_id' => $cancellation->id], $cancellation->approved_by);
+        $order->logActivity('item_cancelled', ($item->product->name ?? 'Article') . " x{$item->quantity} annulé. Raison: {$cancellation->reason}", ['cancellation_id' => $cancellation->id], $cancellation->approved_by);
     }
 
     private function cancelPayment(Payment $payment, Cancellation $cancellation): void
