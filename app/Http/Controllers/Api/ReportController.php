@@ -156,31 +156,32 @@ class ReportController extends Controller
         $date = $request->date ?? today()->toDateString();
         $restaurantId = $request->user()->restaurant_id;
 
-        $items = OrderItem::with(['product:id,name', 'order:id,table_id,paid_at'])
-            ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->join('categories', 'products.category_id', '=', 'categories.id')
-            ->whereHas('order', function($q) use ($restaurantId, $date) {
-                $q->where('restaurant_id', $restaurantId)
-                  ->whereNotIn('status', ['cancelled'])
-                  ->whereDate('created_at', $date);
-            })
-            ->when($request->destination && $request->destination !== 'all', function($q) use ($request) {
-                $q->where('categories.destination', $request->destination);
-            })
+        $items = OrderItem::query()
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.restaurant_id', $request->user()->restaurant_id)
+            ->whereNotIn('orders.status', ['cancelled'])
+            ->whereDate('orders.created_at', $date)
             ->whereNull('order_items.deleted_at')
             ->select('order_items.*')
-            ->orderBy('order_items.created_at', 'desc')
+            ->with(['order', 'product.category'])
             ->get();
 
+        // Filtrer par destination via la collection (plus sûr si les joins SQL ont des ambiguïtés)
+        if ($request->destination && $request->destination !== 'all') {
+            $items = $items->filter(function($item) use ($request) {
+                return ($item->product?->category?->destination ?? 'kitchen') === $request->destination;
+            });
+        }
+
         $summary = [
-            'total_revenue' => (float)$items->sum('subtotal'),
             'items_count'   => $items->sum('quantity'),
-            'orders_count'  => $items->pluck('order_id')->unique()->count()
+            'orders_count'  => $items->unique('order_id')->count(),
+            'total_revenue' => (float) $items->sum('subtotal')
         ];
 
         return response()->json([
             'date'    => $date,
-            'items'   => $items,
+            'items'   => $items->values(), // values() pour réindexer après le filtre
             'summary' => $summary
         ]);
     }

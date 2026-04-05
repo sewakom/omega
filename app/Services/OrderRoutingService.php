@@ -25,6 +25,7 @@ class OrderRoutingService
             'kitchen' => collect(),
             'bar'     => collect(),
             'pizza'   => collect(),
+            'all'     => $items, // On garde une copie de tout
         ];
 
         foreach ($items as $item) {
@@ -32,7 +33,7 @@ class OrderRoutingService
             $groups[$destination]->push($item);
         }
 
-        return array_filter($groups, fn($g) => $g->isNotEmpty());
+        return $groups; // On ne filtre plus pour garder les clés attendues
     }
 
     /**
@@ -40,15 +41,16 @@ class OrderRoutingService
      */
     public function getItemDestination(OrderItem $item): string
     {
-        // Charger la catégorie si pas encore chargée
         $category = $item->product?->category ?? null;
 
-        if (!$category) {
-            return 'kitchen'; // défaut
+        if (!$category || !$category->destination) {
+            return 'kitchen'; 
         }
 
-        return in_array($category->destination, ['kitchen', 'bar', 'pizza'])
-            ? $category->destination
+        $dest = strtolower($category->destination);
+        
+        return in_array($dest, ['kitchen', 'bar', 'pizza'])
+            ? $dest
             : 'kitchen';
     }
 
@@ -57,11 +59,12 @@ class OrderRoutingService
      */
     public function destinationLabel(string $destination): string
     {
-        return match($destination) {
+        return match(strtolower($destination)) {
             'kitchen' => 'CUISINE',
             'bar'     => 'BAR',
             'pizza'   => 'PIZZA',
-            default   => 'CUISINE',
+            'all'     => 'GLOBAL (TOUT)',
+            default   => 'PRODUCTION',
         };
     }
 

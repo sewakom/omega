@@ -122,12 +122,6 @@ class ReceiptController extends Controller
         $destination = $request->get('destination', 'kitchen');
         abort_unless(in_array($destination, ['kitchen', 'bar', 'pizza', 'all']), 422, 'Destination invalide.');
 
-        if ($destination === 'all') {
-            // Simplification: le frontend passe maintenant les destinations de façon spécifique via le Modal de Cuisine.
-            // S'il retombe sur 'all', on génère par défaut la cuisine.
-            $destination = 'kitchen';
-        }
-
         $pdfContent = $this->ticketService->generateKitchenTicketPdf($order, $destination);
 
         if (!$pdfContent) {
