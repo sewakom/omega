@@ -164,7 +164,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('dashboard',        [Api\ReportController::class, 'dashboard']);
         Route::get('sales',            [Api\ReportController::class, 'sales']);
         Route::get('top-products',     [Api\ReportController::class, 'topProducts']);
-        Route::get('department-sales', [Api\ReportController::class, 'departmentSales']);
+        Route::get('department-sales',     [Api\ReportController::class, 'departmentSales']);
+        Route::get('department-sales/pdf', [Api\ReportController::class, 'departmentSalesPdf']);
         Route::get('by-waiter',        [Api\ReportController::class, 'byWaiter']);
         Route::get('by-category',      [Api\ReportController::class, 'byCategory']);
         Route::get('cash-summary',     [Api\ReportController::class, 'cashSummary']);

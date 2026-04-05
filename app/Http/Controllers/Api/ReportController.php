@@ -150,7 +150,7 @@ class ReportController extends Controller
     {
         $request->validate([
             'date'        => 'nullable|date',
-            'destination' => 'required|string|in:bar,kitchen,pizza'
+            'destination' => 'nullable|string'
         ]);
 
         $date = $request->date ?? today()->toDateString();
@@ -164,7 +164,9 @@ class ReportController extends Controller
                   ->whereNotIn('status', ['cancelled'])
                   ->whereDate('created_at', $date);
             })
-            ->where('categories.destination', $request->destination)
+            ->when($request->destination && $request->destination !== 'all', function($q) use ($request) {
+                $q->where('categories.destination', $request->destination);
+            })
             ->whereNull('order_items.deleted_at')
             ->select('order_items.*')
             ->orderBy('order_items.created_at', 'desc')
@@ -181,5 +183,26 @@ class ReportController extends Controller
             'items'   => $items,
             'summary' => $summary
         ]);
+    }
+
+    /**
+     * Export PDF du journal de production
+     */
+    public function departmentSalesPdf(Request $request)
+    {
+        $res = $this->departmentSales($request);
+        $data = $res->getData();
+        $restaurant = $request->user()->restaurant;
+        
+        $html = view('reports.department-sales', [
+            'data'       => $data,
+            'restaurant' => $restaurant,
+            'destination' => $request->destination ?: 'all'
+        ])->render();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download("Production_{$request->destination}_{$data->date}.pdf");
     }
 }
