@@ -34,13 +34,16 @@ class ReportController extends Controller
 
     public function topProducts(Request $request)
     {
-        $request->validate(['from' => 'required|date', 'to' => 'required|date', 'limit' => 'integer|min:5|max:50']);
+        $request->validate(['from' => 'required|date', 'to' => 'required|date', 'limit' => 'integer|min:5|max:50', 'destination' => 'nullable|string']);
 
         $products = OrderItem::with('product:id,name,image')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
             ->whereHas('order', fn($q) => $q->where('restaurant_id', $request->user()->restaurant_id)->where('status', 'paid')->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59']))
-            ->whereNotIn('status', ['cancelled'])
-            ->selectRaw('product_id, SUM(quantity) as total_qty, SUM(subtotal) as revenue')
-            ->groupBy('product_id')->orderByDesc('total_qty')->limit($request->limit ?? 10)->get();
+            ->whereNotIn('order_items.status', ['cancelled'])
+            ->when($request->destination, fn($q) => $q->where('categories.destination', $request->destination))
+            ->selectRaw('order_items.product_id, SUM(order_items.quantity) as total_qty, SUM(order_items.subtotal) as revenue')
+            ->groupBy('order_items.product_id')->orderByDesc('total_qty')->limit($request->limit ?? 10)->get();
 
         return response()->json($products);
     }
@@ -100,6 +103,16 @@ class ReportController extends Controller
         $pendingRevenue = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->sum('total');
         $activeOrders = Order::where('restaurant_id', $restaurantId)->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served', 'served'])->count();
 
+        // NOUVEAU: Ventes par destination (Cuisine, Bar, Pizza) pour aujourd'hui
+        $byDestination = OrderItem::join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today))
+            ->whereNull('order_items.deleted_at')
+            ->selectRaw('categories.destination, SUM(order_items.subtotal) as revenue')
+            ->groupBy('categories.destination')
+            ->get()
+            ->pluck('revenue', 'destination');
+
         // Ventes horaires pour le graphique
         $hourlySales = Order::where('restaurant_id', $restaurantId)
             ->where('status', 'paid')
@@ -128,7 +141,45 @@ class ReportController extends Controller
             'avg_ticket'      => round($avgTicket, 2),
             'growth_percent'  => round($growth, 1), 
             'tables'          => $tablesStats,
+            'by_destination'  => $byDestination,
             'hourly_sales'    => $chartData,
+        ]);
+    }
+
+    public function departmentSales(Request $request)
+    {
+        $request->validate([
+            'date'        => 'nullable|date',
+            'destination' => 'required|string|in:bar,kitchen,pizza'
+        ]);
+
+        $date = $request->date ?? today()->toDateString();
+        $restaurantId = $request->user()->restaurant_id;
+
+        $items = OrderItem::with(['product:id,name', 'order:id,table_id,paid_at'])
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->whereHas('order', function($q) use ($restaurantId, $date) {
+                $q->where('restaurant_id', $restaurantId)
+                  ->whereNotIn('status', ['cancelled'])
+                  ->whereDate('created_at', $date);
+            })
+            ->where('categories.destination', $request->destination)
+            ->whereNull('order_items.deleted_at')
+            ->select('order_items.*')
+            ->orderBy('order_items.created_at', 'desc')
+            ->get();
+
+        $summary = [
+            'total_revenue' => (float)$items->sum('subtotal'),
+            'items_count'   => $items->sum('quantity'),
+            'orders_count'  => $items->pluck('order_id')->unique()->count()
+        ];
+
+        return response()->json([
+            'date'    => $date,
+            'items'   => $items,
+            'summary' => $summary
         ]);
     }
 }
