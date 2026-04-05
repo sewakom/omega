@@ -311,7 +311,7 @@ class OrderController extends Controller
         $this->authorizeOrder($request, $order);
 
         $request->validate([
-            'status' => 'required|in:open,sent_to_kitchen,partially_served,served,paid,cancelled',
+            'status' => 'required|in:open,sent_to_kitchen,partially_served,served,paid,cancelled,cancelling',
             'reason' => 'required_if:status,cancelled|string|min:5'
         ], [
             'reason.required_if' => 'Un motif d\'annulation est obligatoire.'

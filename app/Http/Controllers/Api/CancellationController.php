@@ -26,12 +26,21 @@ class CancellationController extends Controller
             ->where('cancellable_id', $subject->id)->where('status', 'pending')->exists();
         abort_if($existing, 422, 'Une demande d\'annulation est déjà en cours pour cet élément.');
 
+        // Sauvegarder le statut précédent pour restauration en cas de rejet
+        $oldStatus = $subject->status;
+        $subject->update(['status' => 'cancelling']);
+
         $cancellation = Cancellation::create([
             'restaurant_id' => $request->user()->restaurant_id,
             'cancellable_type' => get_class($subject), 'cancellable_id' => $subject->id,
             'requested_by' => $request->user()->id, 'reason' => $request->reason,
-            'notes' => $request->notes, 'status' => 'pending', 'requested_at' => now(),
+            'notes' => ($request->notes ? $request->notes . "\n" : "") . "PREVIOUS_STATUS:{$oldStatus}", 'status' => 'pending', 'requested_at' => now(),
         ]);
+
+        // Notifier le KDS et le POS
+        if ($subject instanceof OrderItem) {
+            broadcast(new \App\Events\OrderItemStatusUpdated($subject, $subject->order))->toOthers();
+        }
 
         // Seul l'ADMIN (BOSS) peut approuver automatiquement
         if ($request->user()->hasRole('admin')) {
@@ -42,7 +51,7 @@ class CancellationController extends Controller
 
         return response()->json([
             'cancellation' => $cancellation, 
-            'message' => 'Demande d\'annulation soumise. La validation du BOSS est requise.'
+            'message' => 'Demande d\'annulation soumise (Statut: En cours d\'annulation). La validation du BOSS est requise.'
         ], 201);
     }
 
@@ -94,9 +103,28 @@ class CancellationController extends Controller
         abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Manager requis.');
         abort_if($cancellation->status !== 'pending', 422, 'Déjà traitée.');
         $request->validate(['reason' => 'required|string']);
-        $cancellation->update(['status' => 'rejected', 'approved_by' => $request->user()->id, 'approved_at' => now(),
-            'notes' => ($cancellation->notes ? $cancellation->notes . "\n" : '') . "Refus: {$request->reason}"]);
-        return response()->json(['message' => 'Demande rejetée.']);
+
+        $subject = $cancellation->cancellable;
+        
+        // Restaurer le statut précédent si disponible
+        if (preg_match('/PREVIOUS_STATUS:(\w+)/', $cancellation->notes, $matches)) {
+            $oldStatus = $matches[1];
+            $subject->update(['status' => $oldStatus]);
+            
+            // Notifier le KDS
+            if ($subject instanceof OrderItem) {
+                broadcast(new \App\Events\OrderItemStatusUpdated($subject, $subject->order))->toOthers();
+            }
+        }
+
+        $cancellation->update([
+            'status' => 'rejected', 
+            'approved_by' => $request->user()->id, 
+            'approved_at' => now(),
+            'notes' => ($cancellation->notes ? $cancellation->notes . "\n" : '') . "Refus: {$request->reason}"
+        ]);
+
+        return response()->json(['message' => 'Demande rejetée. Statut initial restauré.']);
     }
 
     public function index(Request $request)
