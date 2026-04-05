@@ -707,19 +707,23 @@ class TicketPrintService
         $pdf->AddPage();
         
         $pdf->SetFont('Arial', 'B', 12);
+        $pdf->SetFont('Arial', 'B', 12);
         if ($restaurant->logo) {
-            // Optionnel: logiqe pour le logo si nécessaire
+            // Optionnel: logique pour le logo si nécessaire
         }
-        $pdf->Cell(0, 6, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
-        
-        $pdf->SetFont('Arial', '', 8);
-        if ($restaurant->address) $pdf->Cell(0, 4, utf8_decode($restaurant->address), 0, 1, 'C');
-        if ($restaurant->phone)   $pdf->Cell(0, 4, 'Tel : ' . $restaurant->phone, 0, 1, 'C');
-        if ($restaurant->vat_number) $pdf->Cell(0, 4, 'TVA : ' . $restaurant->vat_number, 0, 1, 'C');
-        
-        $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
+        $pdf->Cell(0, 10, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
         
         $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, $order->created_at->format('d/m/Y H:i'), 0, 1, 'C');
+
+        $pdf->SetFont('Arial', '', 9);
+        if ($restaurant->address) $pdf->Cell(0, 5, utf8_decode($restaurant->address), 0, 1, 'C');
+        if ($restaurant->phone)   $pdf->Cell(0, 5, 'Te : ' . $restaurant->phone, 0, 1, 'C');
+        if ($restaurant->vat_number) $pdf->Cell(0, 5, 'TVA : ' . $restaurant->vat_number, 0, 1, 'C');
+        
+        $pdf->Cell(0, 5, '------------------------------------------', 0, 1, 'C');
+        
+        $pdf->SetFont('Arial', 'B', 10);
         $pdf->Cell(40, 5, 'TICKET DE CAISSE', 0, 0);
         $pdf->Cell(30, 5, $order->order_number, 0, 1, 'R');
         
