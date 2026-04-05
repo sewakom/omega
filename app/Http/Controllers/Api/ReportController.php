@@ -166,6 +166,18 @@ class ReportController extends Controller
             ->with(['order', 'product.category'])
             ->get();
 
+        $allItems = $items;
+        
+        // Résumé global par destination pour les onglets
+        $summaryByDestination = $allItems->groupBy(function($item) {
+                return $item->product?->category?->destination ?? 'kitchen';
+            })->map(function($group) {
+                return [
+                    'revenue' => (float) $group->sum('subtotal'),
+                    'count'   => $group->sum('quantity')
+                ];
+            });
+
         // Filtrer par destination via la collection (plus sûr si les joins SQL ont des ambiguïtés)
         if ($request->destination && $request->destination !== 'all') {
             $items = $items->filter(function($item) use ($request) {
@@ -181,8 +193,10 @@ class ReportController extends Controller
 
         return response()->json([
             'date'    => $date,
-            'items'   => $items->values(), // values() pour réindexer après le filtre
-            'summary' => $summary
+            'items'   => $items->values(),
+            'summary' => $summary,
+            'summary_by_destination' => $summaryByDestination,
+            'total_all' => (float) $allItems->sum('subtotal')
         ]);
     }
 

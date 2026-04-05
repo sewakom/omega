@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Table;
 use App\Models\Product;
+use App\Models\Delivery;
 use App\Events\OrderCreated;
 use App\Events\OrderReady;
 use App\Jobs\ProcessStockDeduction;
@@ -127,6 +128,16 @@ class OrderController extends Controller
                     'status'         => 'occupied',
                     'occupied_since' => now(),
                     'assigned_user_id' => $request->user()->id,
+                ]);
+            }
+
+            if ($request->type === 'gozem' || $request->type === 'delivery') {
+                $order->delivery()->create([
+                    'restaurant_id'  => $order->restaurant_id,
+                    'customer_name'  => $order->customer_name ?? 'Client Gozem',
+                    'customer_phone' => $order->customer_phone ?? '0000',
+                    'address'        => 'Via Gozem App', // Valeur par défaut pour Gozem
+                    'status'         => 'pending'
                 ]);
             }
 
@@ -323,7 +334,7 @@ class OrderController extends Controller
                     ->where('id', '!=', $order->id)
                     ->whereIn('status', ['open', 'sent_to_kitchen', 'partially_served'])
                     ->exists();
-                if (!$otherOpen) {
+                if (!$otherOpen && $order->table) {
                     $order->table->update(['status' => 'available', 'occupied_since' => null, 'assigned_user_id' => null]);
                 }
             }
