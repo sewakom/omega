@@ -33,11 +33,17 @@ class CancellationController extends Controller
             'notes' => $request->notes, 'status' => 'pending', 'requested_at' => now(),
         ]);
 
-        if ($request->user()->hasRole(['admin', 'manager', 'cashier'])) {
+        // Seul l'ADMIN (BOSS) peut approuver automatiquement
+        if ($request->user()->hasRole('admin')) {
             return $this->approve($request, $cancellation);
         }
 
-        return response()->json(['cancellation' => $cancellation, 'message' => 'Demande d\'annulation soumise. Un manager doit valider.'], 201);
+        $cancellation->load('requester:id,first_name,last_name');
+
+        return response()->json([
+            'cancellation' => $cancellation, 
+            'message' => 'Demande d\'annulation soumise. La validation du BOSS est requise.'
+        ], 201);
     }
 
     public function approve(Request $request, Cancellation $cancellation)
@@ -45,18 +51,27 @@ class CancellationController extends Controller
         abort_if($cancellation->restaurant_id !== $request->user()->restaurant_id, 403);
         abort_if($cancellation->status !== 'pending', 422, 'Cette demande est déjà traitée.');
 
-        if (!$request->user()->hasRole(['admin', 'manager', 'cashier'])) {
+        // Seul l'ADMIN (BOSS) peut approuver
+        if (!$request->user()->hasRole('admin')) {
             $request->validate(['manager_pin' => 'required|string']);
-            $manager = \App\Models\User::where('restaurant_id', $request->user()->restaurant_id)
-                ->where('active', true)->whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'manager', 'cashier']))
-                ->get()->first(fn($u) => Hash::check($request->manager_pin, $u->pin));
-            abort_if(!$manager, 403, 'PIN manager incorrect.');
-            $approverId = $manager->id;
+            
+            // Chercher un admin avec ce PIN
+            $boss = \App\Models\User::where('restaurant_id', $request->user()->restaurant_id)
+                ->where('active', true)
+                ->whereHas('role', fn($q) => $q->where('name', 'admin'))
+                ->get()
+                ->first(fn($u) => Hash::check($request->manager_pin, $u->pin));
+                
+            abort_if(!$boss, 403, 'PIN du BOSS incorrect ou droits insuffisants.');
+            $approverId = $boss->id;
         } else {
             $approverId = $request->user()->id;
         }
 
-        $request->validate(['refund_amount' => 'nullable|numeric|min:0', 'refund_method' => 'nullable|in:cash,original_method,credit,none']);
+        $request->validate([
+            'refund_amount' => 'nullable|numeric|min:0',
+            'refund_method' => 'nullable|string'
+        ]);
 
         DB::transaction(function () use ($cancellation, $request, $approverId) {
             $cancellation->update([
