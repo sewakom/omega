@@ -48,20 +48,12 @@ class ExpenseController extends Controller
             ->latest()
             ->first();
 
-        // Mappage de sécurité pour éviter l'erreur ENUM 'Data truncated' sur le serveur distant
-        $categoryMapping = [
-            'purchases' => 'other',
-            'staff'     => 'salary',
-            'utilities' => 'other',
-        ];
-
-        $safeCategory = $categoryMapping[$request->category] ?? (in_array($request->category, ['food_supply','equipment','fuel','salary','maintenance','cleaning','other']) ? $request->category : 'other');
-
+        // Créer la dépense
         $expense = Expense::create([
             'restaurant_id'   => $request->user()->restaurant_id,
             'cash_session_id' => $session?->id,
             'user_id'         => $request->user()->id,
-            'category'        => $safeCategory,
+            'category'        => $request->category,
             'description'     => $request->description ?: "Dépense {$request->category}",
             'amount'          => $request->amount,
             'payment_method'  => $request->payment_method ?: 'cash',
