@@ -30,12 +30,13 @@ class KitchenController extends Controller
 
         $orders = Order::with([
                 'items' => fn($q) => $q
-                    ->whereIn('status', ['pending', 'preparing', 'done', 'cancelling'])
-                    ->with(['product.category'])
+                    ->whereIn('status', ['pending', 'preparing', 'done'])
+                    ->with(['product.category', 'cancellations' => fn($c) => $c->where('status', 'pending')])
                     ->orderBy('course')
                     ->orderBy('created_at'),
                 'table:id,number',
                 'waiter:id,first_name,last_name',
+                'cancellations' => fn($q) => $q->where('status', 'pending')
             ])
             ->where('restaurant_id', $request->user()->restaurant_id)
             ->whereIn('status', ['sent_to_kitchen', 'partially_served'])
@@ -68,7 +69,9 @@ class KitchenController extends Controller
         $this->authorizeItem($request, $item);
 
         $request->validate(['status' => 'required|in:preparing,done']);
-        abort_if($item->status === 'cancelling', 422, 'Cet article est en cours d\'annulation. Action impossible.');
+        
+        $hasPendingCancellation = $item->cancellations()->where('status', 'pending')->exists();
+        abort_if($hasPendingCancellation, 422, 'Cet article est en cours d\'annulation. Action impossible.');
 
         $item->update([
             'status'      => $request->status,
@@ -78,17 +81,17 @@ class KitchenController extends Controller
         $order = $item->order;
 
         // Vérifier si tous les items toutes destinations confondues sont terminés
-            $allDone = $order->items()
-                ->whereNotIn('status', ['done', 'served', 'cancelled', 'cancelling'])
-                ->doesntExist();
-    
-            if ($allDone) {
-                // Si tout est fini mais qu'il y a un item en attente d'annulation, on ne marque pas SERVED tout de suite
-                $hasCancelling = $order->items()->where('status', 'cancelling')->exists();
-                if (!$hasCancelling) {
-                    $order->update(['status' => 'served', 'served_at' => now()]);
-                    broadcast(new OrderReady($order->load('table')))->toOthers();
-                }
+        $allDone = $order->items()
+            ->whereNotIn('status', ['done', 'served', 'cancelled'])
+            ->whereDoesntHave('cancellations', fn($q) => $q->where('status', 'pending'))
+            ->doesntExist();
+
+        if ($allDone) {
+            $hasOrderCancellation = $order->cancellations()->where('status', 'pending')->exists();
+            if (!$hasOrderCancellation) {
+                $order->update(['status' => 'served', 'served_at' => now()]);
+                broadcast(new OrderReady($order->load('table')))->toOthers();
+            }
 
             $order->logs()->create([
                 'user_id' => $request->user()->id,
