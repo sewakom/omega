@@ -24,6 +24,7 @@ Route::get('menu/{restaurantSlug}', [Api\ProductController::class, 'publicMenu']
 Route::get('orders/{orderId}/ticket', [Api\ReceiptController::class, 'ticket']);
 Route::get('customer-tabs/{tab}/invoice', [Api\CustomerTabController::class, 'invoice']);
 Route::get('receipts/{orderId}/kitchen-ticket', [Api\ReceiptController::class, 'kitchenTicket']);
+Route::get('expenses/{expense}/receipt',        [Api\ExpenseController::class, 'receipt']);
 Route::get('cash-sessions/{session}/report-preview',   [Api\CashSessionController::class, 'reportPreview']);
 
 // =============================================
