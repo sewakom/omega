@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CakeOrder;
 use App\Models\CashSession;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -53,21 +54,35 @@ class CakeOrderController extends Controller
         $session = CashSession::where('restaurant_id', $request->user()->restaurant_id)
             ->whereNull('closed_at')->latest()->first();
 
-        $order = CakeOrder::create([
-            'restaurant_id'   => $request->user()->restaurant_id,
-            'user_id'         => $request->user()->id,
-            'cash_session_id' => $session?->id,
-            'order_number'    => CakeOrder::generateNumber($request->user()->restaurant_id),
-            'customer_name'   => $request->customer_name,
-            'customer_phone'  => $request->customer_phone,
-            'items'           => $request->items,
-            'total'           => $total,
-            'advance_paid'    => $advance,
-            'remaining_amount'=> max(0, $total - $advance),
-            'delivery_date'   => $request->delivery_date,
-            'delivery_time'   => $request->delivery_time,
-            'notes'           => $request->notes,
-        ]);
+        $order = DB::transaction(function() use ($request, $total, $advance, $session) {
+            $order = CakeOrder::create([
+                'restaurant_id'   => $request->user()->restaurant_id,
+                'user_id'         => $request->user()->id,
+                'cash_session_id' => $session?->id,
+                'order_number'    => CakeOrder::generateNumber($request->user()->restaurant_id),
+                'customer_name'   => $request->customer_name,
+                'customer_phone'  => $request->customer_phone,
+                'items'           => $request->items,
+                'total'           => $total,
+                'advance_paid'    => $advance,
+                'remaining_amount'=> max(0, $total - $advance),
+                'delivery_date'   => $request->delivery_date,
+                'delivery_time'   => $request->delivery_time,
+                'notes'           => $request->notes,
+            ]);
+
+            if ($advance > 0) {
+                Payment::create([
+                    'cake_order_id'   => $order->id,
+                    'cash_session_id' => $session?->id,
+                    'user_id'         => $request->user()->id,
+                    'amount'          => $advance,
+                    'method'          => 'cash',
+                ]);
+            }
+
+            return $order;
+        });
 
         $order->logActivity('cake_order_created', "Commande gâteau #{$order->order_number} pour {$order->customer_name}");
 
@@ -167,6 +182,15 @@ class CakeOrderController extends Controller
                 'remaining_amount'  => 0,
                 'status'            => 'collected',
                 'cash_session_id'   => $session?->id,
+            ]);
+
+            Payment::create([
+                'cake_order_id'   => $cakeOrder->id,
+                'cash_session_id' => $session?->id,
+                'user_id'         => $request->user()->id,
+                'amount'          => $am,
+                'method'          => $pm,
+                'reference'       => $request->payment_reference,
             ]);
         });
 
