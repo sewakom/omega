@@ -189,9 +189,14 @@ class OrderController extends Controller
 
         broadcast(new OrderCreated($order->load('items.product', 'table')))->toOthers();
         
-        // Générer les tickets pour l'impression (Cuisine, Bar, Pizza) - SANS PRIX
+        // Générer les tickets pour l'impression (Cuisine, Bar, Pizza)
         $tickets = [];
         $destinations = ['kitchen', 'bar', 'pizza'];
+
+        /** @var \App\Services\EscPosPrintService $escPosService */
+        $escPosService = app(\App\Services\EscPosPrintService::class);
+        $printingErrors = [];
+
         foreach ($destinations as $dest) {
             $html = $ticketService->kitchenTicketHtml($order, $dest);
             if ($html) {
@@ -199,11 +204,22 @@ class OrderController extends Controller
                     'destination' => $dest,
                     'html' => $html
                 ];
+
+                // Essai d'impression IP thermique
+                $success = $escPosService->printKitchenTicket($order, $dest);
+                if (!$success && !empty($order->restaurant->settings["{$dest}_printer_ip"])) {
+                    $printingErrors[] = $dest;
+                }
             }
         }
 
+        $message = 'Commande envoyée en cuisine.';
+        if (!empty($printingErrors)) {
+            $message .= ' (Erreur impression : ' . implode(', ', $printingErrors) . ')';
+        }
+
         return response()->json([
-            'message' => 'Commande envoyée en cuisine.',
+            'message' => $message,
             'tickets' => $tickets
         ]);
     }

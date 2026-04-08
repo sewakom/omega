@@ -77,7 +77,13 @@ const POSScreen = () => {
                     notes: i.notes
                 }))
             });
-            alert(`Commande ${resp.data.order_number} créée !`);
+
+            // Envoi en cuisine & Impression IP automatique
+            const sendResp = await axios.post(`/api/orders/${resp.data.id}/send-to-kitchen`, {
+                item_ids: resp.data.items.map(i => i.id)
+            });
+
+            alert(`Commande ${resp.data.order_number} créée ! ${sendResp.data.message || ''}`);
             setCart([]);
             setCustomer({ name: '', phone: '' });
         } catch (err) {
