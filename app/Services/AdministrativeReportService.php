@@ -131,13 +131,21 @@ class AdministrativeReportService extends FPDF
 
     private function renderHeader()
     {
+        // Logo
+        if ($this->restaurant->logo && file_exists(storage_path('app/public/' . $this->restaurant->logo))) {
+            try {
+                $this->Image(storage_path('app/public/' . $this->restaurant->logo), 90, 10, 30);
+                $this->Ln(25);
+            } catch (\Exception $e) {}
+        }
+
         // Direction
         $this->SetFont('Arial', 'B', 16);
         $this->Cell(0, 10, $this->s(strtoupper($this->restaurant->name)), 0, 1, 'C');
         
         $this->SetFont('Arial', '', 10);
-        $this->Cell(0, 5, $this->s($this->restaurant->address), 0, 1, 'C');
-        $this->Cell(0, 5, "Telephone: " . $this->s($this->restaurant->phone), 0, 1, 'C');
+        if ($this->restaurant->address) $this->Cell(0, 5, $this->s($this->restaurant->address), 0, 1, 'C');
+        if ($this->restaurant->phone)   $this->Cell(0, 5, "Telephone: " . $this->s($this->restaurant->phone), 0, 1, 'C');
         
         $this->Ln(10);
         

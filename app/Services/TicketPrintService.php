@@ -212,8 +212,8 @@ class TicketPrintService
   {$logoHtml}
   <div class='header'>
     <div class='resto-name'>{$restaurant->name}</div>
-    <div style='font-size:9px'>{$restoAddress}</div>
-    <div style='font-size:9px'>{$restoPhoneHtml}</div>
+    " . ($restoAddress ? "<div style='font-size:9px'>{$restoAddress}</div>" : "") . "
+    " . ($restaurant->phone ? "<div style='font-size:9px'>Tél: {$restaurant->phone}</div>" : "") . "
     <div style='font-size:9px'>{$date}</div>
   </div>
   <div class='table-box'>{$tableLabel}</div>
@@ -344,9 +344,9 @@ class TicketPrintService
   <div class='header'>
     <div class='resto-info'>
       <h1>{$restaurant->name}</h1>
-      <div>{$restoAddr}</div>
-      <div>Tél: {$restaurant->phone}</div>
-      <div>{$restaurant->email}</div>
+      " . ($restoAddr ? "<div>{$restoAddr}</div>" : "") . "
+      " . ($restoPhone ? "<div>Tél: {$restoPhone}</div>" : "") . "
+      " . ($restaurant->email ? "<div>{$restaurant->email}</div>" : "") . "
     </div>
     <div class='invoice-info'>
       <h2>FACTURE</h2>
@@ -419,12 +419,14 @@ class TicketPrintService
 
         // Restaurant Info
         $pdf->SetFont('Helvetica', '', 10);
-        $pdf->Cell(100, 5, utf8_decode($restaurant->address ?? ''), 0, 0);
+        $addr = $restaurant->address ? utf8_decode($restaurant->address) : '';
+        $pdf->Cell(100, 5, $addr, 0, 0);
         $pdf->SetFont('Helvetica', 'B', 11);
         $pdf->Cell(80, 5, 'Ref : INV-' . $order->order_number, 0, 1, 'R');
         
         $pdf->SetFont('Helvetica', '', 10);
-        $pdf->Cell(100, 5, 'Tel : ' . $restaurant->phone, 0, 0);
+        $phone = $restaurant->phone ? 'Tel : ' . $restaurant->phone : '';
+        $pdf->Cell(100, 5, $phone, 0, 0);
         $pdf->Cell(80, 5, 'Date : ' . $order->created_at->format('d/m/Y H:i'), 0, 1, 'R');
 
         if ($restaurant->vat_number) {
@@ -706,12 +708,14 @@ class TicketPrintService
         $pdf->SetMargins(5, 5, 5);
         $pdf->AddPage();
         
-        $pdf->SetFont('Arial', 'B', 12);
-        $pdf->SetFont('Arial', 'B', 12);
-        if ($restaurant->logo) {
-            // Optionnel: logique pour le logo si nécessaire
+        if ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo))) {
+            try {
+                $pdf->Image(storage_path('app/public/' . $restaurant->logo), 30, 5, 20);
+                $pdf->Ln(22);
+            } catch (\Exception $e) {}
+        } else {
+            $pdf->Cell(0, 10, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
         }
-        $pdf->Cell(0, 10, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
         
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(0, 5, $order->created_at->format('d/m/Y H:i'), 0, 1, 'C');
@@ -866,11 +870,16 @@ class TicketPrintService
         $pdf = new Fpdf('P', 'mm', 'A4');
         $pdf->AddPage();
         
-        // Polices
-        $pdf->SetFont('Arial', 'B', 18);
-        $pdf->SetTextColor(26, 26, 46);
-        
+        // Logo si existe
+        if ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo))) {
+            try {
+                $pdf->Image(storage_path('app/public/' . $restaurant->logo), 10, 10, 30);
+                $pdf->Ln(25);
+            } catch (\Exception $e) {}
+        }
+
         // Header
+        $pdf->SetFont('Arial', 'B', 18);
         $pdf->Cell(120, 10, utf8_decode(strtoupper($restaurant->name)), 0, 0);
         $pdf->SetFont('Arial', 'B', 12);
         $pdf->Cell(0, 10, utf8_decode('FACTURE ARDOISE'), 0, 1, 'R');

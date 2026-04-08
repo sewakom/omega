@@ -36,6 +36,9 @@
                     <div class="report-title">Journal de Production — <span class="bg-accent">{{ strtoupper($destination) }}</span></div>
                 </td>
                 <td width="30%" align="right">
+                    @if($restaurant->logo)
+                        <img src="{{ public_path('storage/' . $restaurant->logo) }}" style="max-height: 50px; margin-bottom: 5px;">
+                    @endif
                     <div class="meta">
                         Date: {{ \Carbon\Carbon::parse($data->date)->format('d/m/Y') }}<br>
                         Généré le: {{ now()->format('d/m/Y H:i') }}
