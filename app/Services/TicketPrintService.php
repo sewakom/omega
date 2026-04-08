@@ -73,8 +73,8 @@ class TicketPrintService
             : '';
 
         $restaurant = $order->restaurant;
-        $logoHtml = $restaurant->logo 
-            ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
+        $logoHtml = $restaurant->logo_url 
+            ? "<img src='{$restaurant->logo_url}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
             : "";
 
         $restaurant = $order->restaurant;
@@ -182,8 +182,8 @@ class TicketPrintService
         $cashierName = $order->cashier ? $order->cashier->first_name : 'Caisse';
         $restoAddress = $restaurant->address ?? '';
 
-        $logoHtml = $restaurant->logo 
-            ? "<img src='{$restaurant->logo}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
+        $logoHtml = $restaurant->logo_url 
+            ? "<img src='{$restaurant->logo_url}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
             : "";
 
 
@@ -309,8 +309,8 @@ class TicketPrintService
             $customerBlock = "<div class='customer-block'><strong>Client:</strong> {$order->customer_name} | {$order->customer_phone}</div>";
         }
 
-        $logoHtml = $restaurant->logo 
-            ? "<img src='{$restaurant->logo}' style='max-height:25mm;'>" 
+        $logoHtml = $restaurant->logo_url 
+            ? "<img src='{$restaurant->logo_url}' style='max-height:25mm;'>" 
             : "";
 
         $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance';

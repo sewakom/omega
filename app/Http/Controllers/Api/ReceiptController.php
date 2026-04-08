@@ -110,7 +110,7 @@ class ReceiptController extends Controller
             ->findOrFail($orderId);
 
         $html = $this->ticketService->invoiceA4Html($order);
-        return response($html)->header('Content-Type', 'text/html');
+        return response()->json(['html' => $html]);
     }
 
     /** Ticket cuisine/bar/pizza SANS PRIX */
