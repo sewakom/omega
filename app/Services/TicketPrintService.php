@@ -825,15 +825,15 @@ class TicketPrintService
 
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');
-        // if ($totalGiven > 0) {
-        //     $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
-        //     $pdf->SetFont('Arial', 'B', 9);
-        //     $pdf->Cell(40, 4, utf8_decode('DONNE PAR CLIENT'), 0, 0);
-        //     $pdf->Cell(30, 4, number_format($totalGiven, 0, '.', ' '), 0, 1, 'R');
-        //     $pdf->Cell(40, 4, utf8_decode('MONNAIE RENDUE'), 0, 0);
-        //     $pdf->Cell(30, 4, number_format($totalChange, 0, '.', ' '), 0, 1, 'R');
-        //     $pdf->SetFont('Arial', '', 8);
-        // }
+        if ($totalGiven > 0) {
+            $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->Cell(40, 4, utf8_decode('DONNE PAR CLIENT'), 0, 0);
+            $pdf->Cell(30, 4, number_format($totalGiven, 0, '.', ' '), 0, 1, 'R');
+            $pdf->Cell(40, 4, utf8_decode('MONNAIE RENDUE'), 0, 0);
+            $pdf->Cell(30, 4, number_format($totalChange, 0, '.', ' '), 0, 1, 'R');
+            $pdf->SetFont('Arial', '', 8);
+        }
 
         $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
