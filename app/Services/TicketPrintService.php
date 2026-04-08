@@ -73,7 +73,7 @@ class TicketPrintService
             : '';
 
         $restaurant = $order->restaurant;
-        $logoHtml = $restaurant->logo_url 
+        $logoHtml = ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo)))
             ? "<img src='{$restaurant->logo_url}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
             : "";
 
@@ -182,7 +182,7 @@ class TicketPrintService
         $cashierName = $order->cashier ? $order->cashier->first_name : 'Caisse';
         $restoAddress = $restaurant->address ?? '';
 
-        $logoHtml = $restaurant->logo_url 
+        $logoHtml = ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo)))
             ? "<img src='{$restaurant->logo_url}' style='max-width:40mm;max-height:15mm;display:block;margin:0 auto 4px'>" 
             : "";
 
@@ -309,7 +309,7 @@ class TicketPrintService
             $customerBlock = "<div class='customer-block'><strong>Client:</strong> {$order->customer_name} | {$order->customer_phone}</div>";
         }
 
-        $logoHtml = $restaurant->logo_url 
+        $logoHtml = ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo)))
             ? "<img src='{$restaurant->logo_url}' style='max-height:25mm;'>" 
             : "";
 
