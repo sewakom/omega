@@ -41,6 +41,8 @@ class CustomerTabController extends Controller
             'notes'      => 'nullable|string',
         ]);
 
+        abort_unless($request->user()->isManager(), 403, 'Seul un administrateur peut créer de nouveaux clients.');
+
         // Vérifier si une ardoise ouverte existe déjà pour ce téléphone
         $existing = CustomerTab::where('restaurant_id', $request->user()->restaurant_id)
             ->where('phone', $request->phone)

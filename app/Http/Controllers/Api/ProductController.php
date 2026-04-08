@@ -41,6 +41,7 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'category_id'  => 'required|exists:categories,id',
             'name'         => 'required|string|max:200',
@@ -109,6 +110,7 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         abort_if($product->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
 
         $request->validate([
             'name'        => 'sometimes|string|max:200',
@@ -145,6 +147,7 @@ class ProductController extends Controller
     public function toggleAvailable(Product $product, Request $request)
     {
         abort_if($product->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $product->update(['available' => !$product->available]);
         return response()->json($product);
     }
@@ -152,6 +155,7 @@ class ProductController extends Controller
     public function destroy(Product $product, Request $request)
     {
         abort_if($product->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $product->delete();
         return response()->json(['message' => 'Produit supprimé.']);
     }

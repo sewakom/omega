@@ -32,6 +32,7 @@ class StockController extends Controller
 
     public function createMovement(Request $request)
     {
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'ingredient_id' => 'required|exists:ingredients,id',
             'type'          => 'required|in:in,out,adjustment,waste,return',
@@ -57,7 +58,7 @@ class StockController extends Controller
             StockMovement::create([
                 'restaurant_id'   => $request->user()->restaurant_id,
                 'ingredient_id'   => $ingredient->id,
-                'user_id'         => auth()->id(),
+                'user_id'         => $request->user()->id,
                 'type'            => $request->type,
                 'quantity'        => $request->quantity,
                 'quantity_before' => $quantityBefore,
@@ -94,6 +95,7 @@ class StockController extends Controller
 
     public function saveRecipe(Request $request)
     {
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'product_id'   => 'required|exists:products,id',
             'ingredients'  => 'required|array|min:1',

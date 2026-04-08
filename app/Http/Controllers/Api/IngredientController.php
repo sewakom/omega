@@ -26,6 +26,7 @@ class IngredientController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'name' => 'required|string|max:150', 'unit' => 'required|string|max:20',
             'quantity' => 'numeric|min:0', 'min_quantity' => 'numeric|min:0',
@@ -47,6 +48,7 @@ class IngredientController extends Controller
     public function update(Request $request, Ingredient $ingredient)
     {
         abort_if($ingredient->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'name' => 'sometimes|string|max:150', 'unit' => 'sometimes|string|max:20',
             'min_quantity' => 'numeric|min:0', 'cost_per_unit' => 'numeric|min:0',
@@ -60,6 +62,7 @@ class IngredientController extends Controller
     public function destroy(Request $request, Ingredient $ingredient)
     {
         abort_if($ingredient->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $hasRecipes = $ingredient->recipes()->exists();
         abort_if($hasRecipes, 422, 'Cet ingrédient est utilisé dans des recettes.');
         $ingredient->update(['active' => false]);

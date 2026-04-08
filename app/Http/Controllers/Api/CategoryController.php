@@ -26,6 +26,7 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'name'        => 'required|string|max:100',
             'parent_id'   => 'nullable|exists:categories,id',
@@ -56,6 +57,7 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         abort_if($category->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $request->validate([
             'name'        => 'sometimes|string|max:100',
             'parent_id'   => 'nullable|exists:categories,id',
@@ -77,6 +79,7 @@ class CategoryController extends Controller
     public function destroy(Request $request, Category $category)
     {
         abort_if($category->restaurant_id !== $request->user()->restaurant_id, 403);
+        abort_unless($request->user()->isManager(), 403, 'Manager requis.');
         $hasProducts = $category->products()->where('active', true)->exists();
         abort_if($hasProducts, 422, 'Impossible de supprimer : catégorie contient des produits actifs.');
         $category->update(['active' => false]);
