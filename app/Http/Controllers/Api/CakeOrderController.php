@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CakeOrder;
+use App\Models\CashSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -49,10 +50,13 @@ class CakeOrderController extends Controller
         $total = collect($request->items)->sum(fn($i) => $i['qty'] * $i['unit_price']);
         $advance = $request->advance_paid ?? 0;
 
+        $session = CashSession::where('restaurant_id', $request->user()->restaurant_id)
+            ->whereNull('closed_at')->latest()->first();
+
         $order = CakeOrder::create([
             'restaurant_id'   => $request->user()->restaurant_id,
             'user_id'         => $request->user()->id,
-            'cash_session_id' => $this->getActiveSession($request->user()->restaurant_id)?->id,
+            'cash_session_id' => $session?->id,
             'order_number'    => CakeOrder::generateNumber($request->user()->restaurant_id),
             'customer_name'   => $request->customer_name,
             'customer_phone'  => $request->customer_phone,
@@ -107,6 +111,9 @@ class CakeOrderController extends Controller
         DB::transaction(function () use ($cakeOrder, $request) {
             $totalPaid = $cakeOrder->advance_paid + $request->amount_paid;
 
+            $session = CashSession::where('restaurant_id', $cakeOrder->restaurant_id)
+                ->whereNull('closed_at')->latest()->first();
+
             $cakeOrder->update([
                 'is_paid'           => true,
                 'paid_at'           => now(),
@@ -115,7 +122,7 @@ class CakeOrderController extends Controller
                 'advance_paid'      => $totalPaid,
                 'remaining_amount'  => 0,
                 'status'            => 'collected',
-                'cash_session_id'   => $this->getActiveSession($cakeOrder->restaurant_id)?->id,
+                'cash_session_id'   => $session?->id,
             ]);
         });
 
