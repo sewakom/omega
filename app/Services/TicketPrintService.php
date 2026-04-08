@@ -707,6 +707,7 @@ class TicketPrintService
         $pdf = new Fpdf('P', 'mm', array(80, 200 + ($items->count() * 15)));
         $pdf->SetMargins(5, 5, 5);
         $pdf->AddPage();
+        $pdf->SetFont('Arial', 'B', 12);
         
         if ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo))) {
             try {
