@@ -117,6 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',                               [Api\CakeOrderController::class, 'index']);
         Route::post('/',                              [Api\CakeOrderController::class, 'store']);
         Route::get('/{cakeOrder}',                    [Api\CakeOrderController::class, 'show']);
+        Route::put('/{cakeOrder}',                    [Api\CakeOrderController::class, 'update']);
         Route::patch('/{cakeOrder}/status',           [Api\CakeOrderController::class, 'updateStatus']);
         Route::post('/{cakeOrder}/collect',           [Api\CakeOrderController::class, 'collect']);
         Route::get('/{cakeOrder}/ticket',             [Api\CakeOrderController::class, 'ticket']);

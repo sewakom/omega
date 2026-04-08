@@ -81,6 +81,45 @@ class CakeOrderController extends Controller
         return response()->json($cakeOrder->load('cashier:id,first_name,last_name'));
     }
 
+    /** Modifier une commande gâteau */
+    public function update(Request $request, CakeOrder $cakeOrder)
+    {
+        abort_if($cakeOrder->restaurant_id !== $request->user()->restaurant_id, 403);
+
+        $request->validate([
+            'customer_name'   => 'required|string|max:150',
+            'customer_phone'  => 'nullable|string|max:20',
+            'delivery_date'   => 'required|date',
+            'delivery_time'   => 'nullable|date_format:H:i',
+            'items'           => 'required|array|min:1',
+            'items.*.name'    => 'required|string',
+            'items.*.qty'     => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.notes'   => 'nullable|string',
+            'advance_paid'    => 'nullable|numeric|min:0',
+            'notes'           => 'nullable|string',
+        ]);
+
+        $total = collect($request->items)->sum(fn($i) => $i['qty'] * $i['unit_price']);
+        $advance = $request->advance_paid ?? $cakeOrder->advance_paid ?? 0;
+
+        $cakeOrder->update([
+            'customer_name'   => $request->customer_name,
+            'customer_phone'  => $request->customer_phone,
+            'items'           => $request->items,
+            'total'           => $total,
+            'advance_paid'    => $advance,
+            'remaining_amount'=> max(0, $total - $advance),
+            'delivery_date'   => $request->delivery_date,
+            'delivery_time'   => $request->delivery_time,
+            'notes'           => $request->notes,
+        ]);
+
+        $cakeOrder->logActivity('cake_order_updated', "Commande gâteau #{$cakeOrder->order_number} modifiée");
+
+        return response()->json($cakeOrder->fresh());
+    }
+
     /** Mettre à jour le statut d'une commande gâteau */
     public function updateStatus(Request $request, CakeOrder $cakeOrder)
     {
