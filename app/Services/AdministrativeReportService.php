@@ -87,6 +87,35 @@ class AdministrativeReportService extends FPDF
         $orderStats = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today)
             ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers')->first();
 
+        // Ardoises (Crédits) accordées ce jour (Commandes passées aujourd'hui mais mises en ardoise)
+        $ardoisesGrantedToday = Order::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $today)
+            ->whereHas('customerTabs')
+            ->sum('total');
+
+        // Paiements perçus aujourd'hui sur les ardoises créées aujourd'hui
+        $paymentsOnTodayArdoises = Payment::whereHas('order', function($q) use ($restaurantId, $today) {
+                $q->where('restaurant_id', $restaurantId)
+                  ->whereDate('created_at', $today)
+                  ->whereHas('customerTabs');
+            })
+            ->whereDate('created_at', $today)
+            ->sum('amount');
+
+        // Impayés réels du jour (Valeur des crédits accordés aujourd'hui non encore payés)
+        $unpaidArdoisesToday = max(0, $ardoisesGrantedToday - $paymentsOnTodayArdoises);
+
+        // Paiements perçus aujourd'hui pour des commandes POS ou Gâteaux créées *avant* aujourd'hui (Recouvrement de dettes)
+        $pastDebtsCollectedToday = Payment::where(function($q) use ($restaurantId, $today) {
+                $q->whereHas('order', function($q) use ($restaurantId, $today) {
+                    $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today);
+                })->orWhereHas('cakeOrder', function($q) use ($restaurantId, $today) {
+                    $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today);
+                });
+            })
+            ->whereDate('created_at', $today)
+            ->sum('amount');
+
         return [
             'date'           => $today,
             'total_collected' => (float)$payments->sum('total'), // Tout l'argent encaisse
@@ -96,6 +125,8 @@ class AdministrativeReportService extends FPDF
             'cake_revenue'   => (float)$cakeRevenue,
             'expenses'       => $expenses,
             'order_stats'    => $orderStats,
+            'unpaid_ardoises_today' => (float)$unpaidArdoisesToday,
+            'past_debts_collected_today' => (float)$pastDebtsCollectedToday,
         ];
     }
 
@@ -147,7 +178,16 @@ class AdministrativeReportService extends FPDF
         $this->SetFont('Arial', 'B', 12);
         $this->Cell(70, 8, number_format($this->data['total_collected'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
         $this->SetFont('Arial', 'I', 9);
-        $this->Cell(190, 5, $this->s("   *Peut différer du C.A. en cas de crédits, ardoises, ou acomptes antérieurs.*"), 0, 1, 'L');
+        $this->Cell(190, 5, $this->s("   *L'argent collecté diffère du CA notamment à cause des ardoises et des acomptes :*"), 0, 1, 'L');
+        
+        $this->SetFont('Arial', 'I', 11);
+        $this->SetTextColor(100, 100, 100);
+        $this->Cell(120, 7, $this->s("   - Ardoises / Crédits accordés ce jour (Restant à payer):"), 0, 0);
+        $this->Cell(70, 7, number_format($this->data['unpaid_ardoises_today'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+
+        $this->Cell(120, 7, $this->s("   - Recouvrements (Paiements perçus pour paiements antérieurs):"), 0, 0);
+        $this->Cell(70, 7, number_format($this->data['past_debts_collected_today'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+        $this->SetTextColor(0);
 
         $this->Ln(4);
         $this->Line($this->GetX() + 80, $this->GetY(), $this->GetX() + 190, $this->GetY());
