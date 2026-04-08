@@ -58,7 +58,8 @@ class DataExportService
     {
         $handle = fopen($path, 'w');
         fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
-        fputcsv($handle, ['ID', 'Numero', 'Type', 'Statut', 'Client', 'Couverts', 'Sous-total', 'Remise', 'TVA', 'TOTAL', 'Cree le', 'Paye le']);
+        fputs($handle, "sep=;\n"); // Excel delimiter hint
+        fputcsv($handle, ['ID', 'Numero', 'Type', 'Statut', 'Client', 'Couverts', 'Sous-total', 'Remise', 'TVA', 'TOTAL', 'Cree le', 'Paye le'], ';');
 
         Order::where('restaurant_id', $restaurantId)
             ->whereBetween('created_at', [$from, $to])
@@ -77,7 +78,7 @@ class DataExportService
                         $o->total,
                         $o->created_at->format('d/m/Y H:i'),
                         $o->paid_at ? $o->paid_at->format('d/m/Y H:i') : ''
-                    ]);
+                    ], ';');
                 }
             });
 
@@ -88,7 +89,8 @@ class DataExportService
     {
         $handle = fopen($path, 'w');
         fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
-        fputcsv($handle, ['ID', 'Commande #', 'Article', 'Categorie', 'Destination', 'Quantite', 'P.U.', 'Sous-total', 'Statut', 'Date']);
+        fputs($handle, "sep=;\n"); // Excel delimiter hint
+        fputcsv($handle, ['ID', 'Commande #', 'Article', 'Categorie', 'Destination', 'Quantite', 'P.U.', 'Sous-total', 'Statut', 'Date'], ';');
 
         OrderItem::with(['order', 'product.category'])
             ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereBetween('created_at', [$from, $to]))
@@ -105,7 +107,7 @@ class DataExportService
                         $item->subtotal,
                         $item->status,
                         $item->created_at->format('d/m/Y H:i')
-                    ]);
+                    ], ';');
                 }
             });
 
@@ -116,7 +118,8 @@ class DataExportService
     {
         $handle = fopen($path, 'w');
         fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
-        fputcsv($handle, ['ID', 'Commande #', 'Gateau #', 'Mode', 'Montant', 'Reference', 'Date']);
+        fputs($handle, "sep=;\n"); // Excel delimiter hint
+        fputcsv($handle, ['ID', 'Commande #', 'Gateau #', 'Mode', 'Montant', 'Reference', 'Date'], ';');
 
         Payment::with(['order', 'cakeOrder'])
             ->where(function($q) use ($restaurantId) {
@@ -134,7 +137,7 @@ class DataExportService
                         $p->amount,
                         $p->reference,
                         $p->created_at->format('d/m/Y H:i')
-                    ]);
+                    ], ';');
                 }
             });
 
@@ -145,7 +148,8 @@ class DataExportService
     {
         $handle = fopen($path, 'w');
         fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
-        fputcsv($handle, ['ID', 'Type', 'ID Objet', 'Motif', 'Par', 'Approuve par', 'Date']);
+        fputs($handle, "sep=;\n"); // Excel delimiter hint
+        fputcsv($handle, ['ID', 'Type', 'ID Objet', 'Motif', 'Par', 'Approuve par', 'Date'], ';');
 
         Cancellation::with(['requester', 'approver'])
             ->where('restaurant_id', $restaurantId)
@@ -160,7 +164,7 @@ class DataExportService
                         ($c->requester->first_name ?? '') . ' ' . ($c->requester->last_name ?? ''),
                         ($c->approver->first_name ?? '') . ' ' . ($c->approver->last_name ?? ''),
                         $c->created_at->format('d/m/Y H:i')
-                    ]);
+                    ], ';');
                 }
             });
 
@@ -171,7 +175,8 @@ class DataExportService
     {
         $handle = fopen($path, 'w');
         fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
-        fputcsv($handle, ['ID', 'Numero', 'Client', 'Telephone', 'Date Recuperation', 'TOTAL', 'Encaisse', 'Statut', 'Cree le']);
+        fputs($handle, "sep=;\n"); // Excel delimiter hint
+        fputcsv($handle, ['ID', 'Numero', 'Client', 'Telephone', 'Date Recuperation', 'TOTAL', 'Encaisse', 'Statut', 'Cree le'], ';');
 
         CakeOrder::where('restaurant_id', $restaurantId)
             ->whereBetween('created_at', [$from, $to])
@@ -187,7 +192,7 @@ class DataExportService
                         $cake->advance_paid,
                         $cake->status,
                         $cake->created_at->format('d/m/Y H:i')
-                    ]);
+                    ], ';');
                 }
             });
 
