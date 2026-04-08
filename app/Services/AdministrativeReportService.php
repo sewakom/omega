@@ -55,7 +55,22 @@ class AdministrativeReportService extends FPDF
     {
         $today = $date;
 
-        // Paiements (Argent REEL encaisse aujourd'hui) - Inclut Commandes + Gateaux
+        // 1. CHIFFRE D'AFFAIRES (Ventes RÉELLES du jour : Commandes et Gâteaux créés aujourd'hui)
+        $orderStats = Order::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $today)
+            ->where('status', '!=', 'cancelled')
+            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers')->first();
+            
+        $restaurant_ca = (float)($orderStats->revenue ?? 0);
+
+        $cake_value_today = \App\Models\CakeOrder::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $today)
+            ->where('status', '!=', 'cancelled')
+            ->sum('total');
+
+        $total_ca = $restaurant_ca + (float)$cake_value_today;
+
+        // 2. ARGENT COLLECTÉ (Liquidité entrante aujourd'hui)
         $payments = Payment::where(function($q) use ($restaurantId) {
                 $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
                   ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId));
@@ -63,70 +78,54 @@ class AdministrativeReportService extends FPDF
             ->whereDate('created_at', $today)
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
 
-        // Ventilation par Destination (Uniquement Restaurant Standard)
+        $total_collected = (float)$payments->sum('total');
+
+        // 3. LE PONT MATHÉMATIQUE (Différences)
+        // A. Paiements reçus aujourd'hui pour les ventes d'aujourd'hui
+        $paymentsOnTodayOrders = Payment::where(function($q) use ($restaurantId, $today) {
+                $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('created_at', $today))
+                  ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('created_at', $today));
+            })
+            ->whereDate('created_at', $today)
+            ->sum('amount');
+
+        // Impayés du jour (Ardoises, crédits, restes à payer sur les ventes d'aujourd'hui)
+        $unpaid_from_today = max(0, $total_ca - $paymentsOnTodayOrders);
+
+        // B. Paiements reçus aujourd'hui pour des commandes antérieures (Acquittement de dettes)
+        $past_debts_collected_today = Payment::where(function($q) use ($restaurantId, $today) {
+                $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today))
+                  ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today));
+            })
+            ->whereDate('created_at', $today)
+            ->sum('amount');
+
+        // DEPENSES
+        $expenses = Expense::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $today)
+            ->get();
+
+        // VENTILATION PAR SECTION (Sur les commandes créées aujourd'hui)
         $byDestination = OrderItem::join('products', 'order_items.product_id', '=', 'products.id')
             ->join('categories', 'products.category_id', '=', 'categories.id')
-            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today))
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereDate('created_at', $today)->where('status', '!=', 'cancelled'))
             ->whereNull('order_items.deleted_at')
             ->selectRaw('categories.destination, SUM(order_items.subtotal) as revenue')
             ->groupBy('categories.destination')
             ->get()
             ->pluck('revenue', 'destination');
 
-        // Revenu Gateaux specifique (Argent encaisse aujourd'hui pour les gateaux)
-        $cakeRevenue = Payment::whereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId))
-            ->whereDate('created_at', $today)
-            ->sum('amount');
-
-        // Depenses
-        $expenses = Expense::where('restaurant_id', $restaurantId)
-            ->whereDate('created_at', $today)
-            ->get();
-
-        // Stats Commandes Restaurant Standard
-        $orderStats = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $today)
-            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers')->first();
-
-        // Ardoises (Crédits) accordées ce jour (Commandes passées aujourd'hui mais mises en ardoise)
-        $ardoisesGrantedToday = Order::where('restaurant_id', $restaurantId)
-            ->whereDate('created_at', $today)
-            ->whereHas('customerTabs')
-            ->sum('total');
-
-        // Paiements perçus aujourd'hui sur les ardoises créées aujourd'hui
-        $paymentsOnTodayArdoises = Payment::whereHas('order', function($q) use ($restaurantId, $today) {
-                $q->where('restaurant_id', $restaurantId)
-                  ->whereDate('created_at', $today)
-                  ->whereHas('customerTabs');
-            })
-            ->whereDate('created_at', $today)
-            ->sum('amount');
-
-        // Impayés réels du jour (Valeur des crédits accordés aujourd'hui non encore payés)
-        $unpaidArdoisesToday = max(0, $ardoisesGrantedToday - $paymentsOnTodayArdoises);
-
-        // Paiements perçus aujourd'hui pour des commandes POS ou Gâteaux créées *avant* aujourd'hui (Recouvrement de dettes)
-        $pastDebtsCollectedToday = Payment::where(function($q) use ($restaurantId, $today) {
-                $q->whereHas('order', function($q) use ($restaurantId, $today) {
-                    $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today);
-                })->orWhereHas('cakeOrder', function($q) use ($restaurantId, $today) {
-                    $q->where('restaurant_id', $restaurantId)->whereDate('created_at', '<', $today);
-                });
-            })
-            ->whereDate('created_at', $today)
-            ->sum('amount');
-
         return [
             'date'           => $today,
-            'total_collected' => (float)$payments->sum('total'), // Tout l'argent encaisse
-            'restaurant_ca'  => (float)($orderStats->revenue ?? 0), // Valeur des commandes payees
+            'total_collected' => $total_collected,
+            'restaurant_ca'  => $restaurant_ca,
             'payments'       => $payments,
             'by_destination' => $byDestination,
-            'cake_revenue'   => (float)$cakeRevenue,
+            'cake_revenue'   => (float)$cake_value_today,
             'expenses'       => $expenses,
             'order_stats'    => $orderStats,
-            'unpaid_ardoises_today' => (float)$unpaidArdoisesToday,
-            'past_debts_collected_today' => (float)$pastDebtsCollectedToday,
+            'unpaid_ardoises_today' => (float)$unpaid_from_today,
+            'past_debts_collected_today' => (float)$past_debts_collected_today,
         ];
     }
 
@@ -224,17 +223,34 @@ class AdministrativeReportService extends FPDF
             'gateaux' => 'Pâtisserie / Gâteaux'
         ];
 
+        $sumOfSections = 0;
         foreach ($pillars as $key => $label) {
             $amount = 0;
             if ($key === 'gateaux') {
                 $amount = $this->data['cake_revenue'];
             } else {
                 $amount = $this->data['by_destination'][$key] ?? 0;
+                $sumOfSections += $amount;
             }
 
             $this->Cell(120, 10, $this->s($label), 1, 0, 'L');
             $this->Cell(70, 10, number_format($amount, 0, ',', ' ') . " F", 1, 1, 'R');
         }
+
+        // Différence due à la TVA, aux remises ou aux frais de livraison
+        $annexes = $this->data['restaurant_ca'] - $sumOfSections;
+        if (round($annexes, 2) != 0) {
+            $this->SetFont('Arial', 'I', 10);
+            $this->Cell(120, 10, $this->s("TVA, Remises et Frais Annexes"), 1, 0, 'L');
+            $this->Cell(70, 10, number_format($annexes, 0, ',', ' ') . " F", 1, 1, 'R');
+            $this->SetFont('Arial', '', 11);
+        }
+
+        // Ligne de totalisation pour prouver que Section 2 = Section 1
+        $this->SetFont('Arial', 'B', 11);
+        $totalCA = $this->data['restaurant_ca'] + $this->data['cake_revenue'];
+        $this->Cell(120, 10, $this->s("TOTAL GLOBAL DES VENTES"), 1, 0, 'R', true);
+        $this->Cell(70, 10, number_format($totalCA, 0, ',', ' ') . " F", 1, 1, 'R', true);
 
         $this->Ln(10);
     }
