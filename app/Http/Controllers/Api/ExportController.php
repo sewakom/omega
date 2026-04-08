@@ -24,17 +24,17 @@ class ExportController extends Controller
         $restaurantId = $request->user()->restaurant_id;
         
         try {
-            $zipPath = $this->exportService->exportToZip(
+            $xlsPath = $this->exportService->exportToExcel(
                 $request->from,
                 $request->to,
                 $restaurantId
             );
 
-            if (!file_exists($zipPath)) {
+            if (!file_exists($xlsPath)) {
                 return response()->json(['message' => 'Erreur lors de la génération du fichier.'], 500);
             }
 
-            return response()->download($zipPath)->deleteFileAfterSend(true);
+            return response()->download($xlsPath)->deleteFileAfterSend(true);
             
         } catch (\Exception $e) {
             Log::error('Export Error: ' . $e->getMessage(), [
