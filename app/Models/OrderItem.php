@@ -24,4 +24,5 @@ class OrderItem extends Model
     public function order()     { return $this->belongsTo(Order::class); }
     public function product()   { return $this->belongsTo(Product::class); }
     public function modifiers() { return $this->hasMany(OrderItemModifier::class); }
+    public function cancellations(){ return $this->morphMany(Cancellation::class, 'cancellable'); }
 }
