@@ -17,7 +17,11 @@ class OrderController extends Controller
 {
     public function index(Request $request)
     {
-        $orders = Order::with(['table', 'waiter', 'items.product'])
+        $orders = Order::with([
+            'table', 'waiter', 'items.product',
+            'cancellations' => fn($q) => $q->where('status', 'pending'),
+            'items.cancellations' => fn($q) => $q->where('status', 'pending')
+        ])
             ->where('restaurant_id', $request->user()->restaurant_id)
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->table_id, fn($q) => $q->where('table_id', $request->table_id))
@@ -35,8 +39,10 @@ class OrderController extends Controller
         $order = Order::with([
                 'items.product',
                 'items.modifiers.modifier',
+                'items.cancellations' => fn($q) => $q->where('status', 'pending'),
                 'waiter:id,first_name,last_name',
                 'logs' => fn($q) => $q->latest()->limit(20),
+                'cancellations' => fn($q) => $q->where('status', 'pending')
             ])
             ->where('restaurant_id', $request->user()->restaurant_id)
             ->where('table_id', $tableId)
