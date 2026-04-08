@@ -20,7 +20,7 @@ class EscPosPrintService
     /**
      * Envoie la commande d'impression directement à l'imprimante thermique via réseau (IP)
      */
-    public function printKitchenTicket(Order $order, string $destination): bool
+    public function printKitchenTicket(Order $order, string $destination, $itemsToPrint = null, bool $isModification = false): array
     {
         $order->loadMissing(['items.product.category', 'table', 'waiter', 'restaurant']);
         
@@ -30,15 +30,20 @@ class EscPosPrintService
 
         if (!$ip) {
             // Aucune IP configurée pour ce pôle, on ignore silencieusement
-            return false;
+            return ['success' => true, 'message' => 'Non configurée'];
         }
 
-        $filteredItems = $order->items->whereNotIn('status', ['cancelled']);
-        $allGroups = $this->routing->groupByDestination($filteredItems);
-        $items = $allGroups[$destination] ?? collect();
+        if ($itemsToPrint) {
+            $allGroups = $this->routing->groupByDestination($itemsToPrint);
+            $items = $allGroups[$destination] ?? collect();
+        } else {
+            $filteredItems = $order->items->whereNotIn('status', ['cancelled']);
+            $allGroups = $this->routing->groupByDestination($filteredItems);
+            $items = $allGroups[$destination] ?? collect();
+        }
 
         if ($items->isEmpty()) {
-            return true; // Rien à imprimer pour cette destination
+            return ['success' => true]; // Rien à imprimer pour cette destination
         }
 
         try {
@@ -47,6 +52,11 @@ class EscPosPrintService
             
             // Entête
             $printer->setJustification(Printer::JUSTIFY_CENTER);
+            if ($isModification) {
+                $printer->setTextSize(2, 2);
+                $printer->text("*** MODIFICATION ***\n");
+            }
+
             $printer->setTextSize(2, 2);
             // Convertir les caractères spéciaux
             $printer->text(strtoupper($this->removeAccents($this->routing->destinationLabel($destination))) . "\n");
@@ -101,10 +111,11 @@ class EscPosPrintService
             $printer->cut();
             $printer->close();
 
-            return true;
+            return ['success' => true];
         } catch (Exception $e) {
-            Log::error("Failed to print to {$destination} printer at {$ip}: " . $e->getMessage());
-            return false;
+            $errorMsg = $e->getMessage();
+            Log::error("Failed to print to {$destination} printer at {$ip}: " . $errorMsg);
+            return ['success' => false, 'message' => $errorMsg];
         }
     }
 

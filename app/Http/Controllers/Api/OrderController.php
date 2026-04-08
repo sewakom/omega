@@ -205,10 +205,10 @@ class OrderController extends Controller
                     'html' => $html
                 ];
 
-                // Essai d'impression IP thermique
-                $success = $escPosService->printKitchenTicket($order, $dest);
-                if (!$success && !empty($order->restaurant->settings["{$dest}_printer_ip"])) {
-                    $printingErrors[] = $dest;
+                // Essai d'impression IP thermique pour LES NOUVEAUX ARTICLES UNIQUEMENT
+                $result = $escPosService->printKitchenTicket($order, $dest, $items, false);
+                if (!$result['success']) {
+                    $printingErrors[] = strtoupper($dest) . " ({$result['message']})";
                 }
             }
         }
