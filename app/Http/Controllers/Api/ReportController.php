@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\OrderItem;
+use App\Services\AdministrativeReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -295,18 +296,17 @@ class ReportController extends Controller
     }
 
     /**
-     * Export PDF de l'analyse complète
+     * Export PDF de l'analyse complète (Version Administrative FPDF)
      */
-    public function dailyAnalysisPdf(Request $request)
+    public function dailyAnalysisPdf(Request $request, AdministrativeReportService $reportService)
     {
-        $data = $this->dailyAnalysis($request);
+        $date = $request->date ?? today()->toDateString();
         $restaurant = $request->user()->restaurant;
         
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.daily-full', [
-            'data'       => $data,
-            'restaurant' => $restaurant,
-        ])->setPaper('a4', 'portrait');
+        $pdfContent = $reportService->generateDailyReport($date, $restaurant);
 
-        return $pdf->download("Rapport_Analyse_{$data['date']}.pdf");
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "attachment; filename=\"Rapport_Administratif_{$date}.pdf\"");
     }
 }
