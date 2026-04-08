@@ -149,8 +149,8 @@ class CakeOrderController extends Controller
             'amount'            => 'required_without:amount_paid|numeric|min:0',
         ]);
 
-        $pm = $request->payment_method ?? $request->method;
-        $am = $request->amount_paid ?? $request->amount;
+        $pm = $request->input('payment_method') ?? $request->input('method');
+        $am = $request->input('amount_paid') ?? $request->input('amount');
 
         DB::transaction(function () use ($cakeOrder, $pm, $am, $request) {
             $totalPaid = $cakeOrder->advance_paid + $am;
