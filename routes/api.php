@@ -121,6 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{cakeOrder}/status',           [Api\CakeOrderController::class, 'updateStatus']);
         Route::post('/{cakeOrder}/collect',           [Api\CakeOrderController::class, 'collect']);
         Route::get('/{cakeOrder}/ticket',             [Api\CakeOrderController::class, 'ticket']);
+        Route::get('/{cakeOrder}/pdf',                [Api\CakeOrderController::class, 'receiptPdf']);
     });
 
     // Catégories
