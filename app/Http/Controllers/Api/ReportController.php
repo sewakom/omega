@@ -232,4 +232,81 @@ class ReportController extends Controller
 
         return $pdf->download("Production_{$request->destination}_{$data->date}.pdf");
     }
+
+    /**
+     * Analyse complète du jour (Données JSON)
+     */
+    public function dailyAnalysis(Request $request)
+    {
+        $date = $request->date ?? today()->toDateString();
+        $restaurantId = $request->user()->restaurant_id;
+
+        // 1. Résumé Global (Paiements)
+        $payments = Payment::where(function($q) use ($restaurantId) {
+                $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
+                  ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId));
+            })
+            ->whereDate('created_at', $date)
+            ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')->groupBy('method')->get();
+            
+        $totalRevenue = $payments->sum('total');
+
+        // 2. Répartition par Destination (Restaurant/Bar/Pizza/Cuisine)
+        $byDestination = OrderItem::join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $date))
+            ->whereNull('order_items.deleted_at')
+            ->selectRaw('categories.destination, SUM(order_items.subtotal) as revenue')
+            ->groupBy('categories.destination')
+            ->get();
+
+        // 3. Détail des Gâteaux (encaissé aujourd'hui)
+        $cakePayments = Payment::whereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId))
+            ->with('cakeOrder:id,order_number,customer_name')
+            ->whereDate('created_at', $date)
+            ->get();
+
+        // 4. Dépenses
+        $expenses = \App\Models\Expense::where('restaurant_id', $restaurantId)
+            ->whereDate('created_at', $date)
+            ->get();
+
+        // 5. Statistiques Commandes Standard
+        $ordersStats = Order::where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $date)
+            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers, SUM(vat_amount) as vat')->first();
+
+        // 6. Top Produits
+        $topProducts = OrderItem::with('product:id,name')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->where('status', 'paid')->whereDate('paid_at', $date))
+            ->selectRaw('order_items.product_id, SUM(order_items.quantity) as qty, SUM(order_items.subtotal) as revenue')
+            ->groupBy('order_items.product_id')->orderByDesc('revenue')->limit(5)->get();
+
+        return [
+            'date'           => $date,
+            'total_revenue'  => (float) $totalRevenue,
+            'payments'       => $payments,
+            'by_destination' => $byDestination,
+            'cake_payments'  => $cakePayments,
+            'expenses'       => $expenses,
+            'orders_stats'   => $ordersStats,
+            'top_products'   => $topProducts,
+        ];
+    }
+
+    /**
+     * Export PDF de l'analyse complète
+     */
+    public function dailyAnalysisPdf(Request $request)
+    {
+        $data = $this->dailyAnalysis($request);
+        $restaurant = $request->user()->restaurant;
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.daily-full', [
+            'data'       => $data,
+            'restaurant' => $restaurant,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download("Rapport_Analyse_{$data['date']}.pdf");
+    }
 }
