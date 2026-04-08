@@ -142,13 +142,18 @@ class CakeOrderController extends Controller
         abort_if($cakeOrder->is_paid, 422, 'Commande déjà encaissée.');
 
         $request->validate([
-            'payment_method'    => 'required|in:cash,card,wave,orange_money,bank,other',
+            'payment_method'    => 'required_without:method|in:cash,card,wave,orange_money,momo,moov,mixx,bank,other',
+            'method'            => 'required_without:payment_method|in:cash,card,wave,orange_money,momo,moov,mixx,bank,other',
             'payment_reference' => 'nullable|string|max:100',
-            'amount_paid'       => 'required|numeric|min:0',
+            'amount_paid'       => 'required_without:amount|numeric|min:0',
+            'amount'            => 'required_without:amount_paid|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($cakeOrder, $request) {
-            $totalPaid = $cakeOrder->advance_paid + $request->amount_paid;
+        $pm = $request->payment_method ?? $request->method;
+        $am = $request->amount_paid ?? $request->amount;
+
+        DB::transaction(function () use ($cakeOrder, $pm, $am, $request) {
+            $totalPaid = $cakeOrder->advance_paid + $am;
 
             $session = CashSession::where('restaurant_id', $cakeOrder->restaurant_id)
                 ->whereNull('closed_at')->latest()->first();
@@ -156,7 +161,7 @@ class CakeOrderController extends Controller
             $cakeOrder->update([
                 'is_paid'           => true,
                 'paid_at'           => now(),
-                'payment_method'    => $request->payment_method,
+                'payment_method'    => $pm,
                 'payment_reference' => $request->payment_reference,
                 'advance_paid'      => $totalPaid,
                 'remaining_amount'  => 0,
@@ -165,7 +170,7 @@ class CakeOrderController extends Controller
             ]);
         });
 
-        $cakeOrder->logActivity('cake_order_paid', "Commande #{$cakeOrder->order_number} encaissée ({$request->payment_method})");
+        $cakeOrder->logActivity('cake_order_paid', "Commande #{$cakeOrder->order_number} encaissée ({$pm})");
 
         return response()->json([
             'message' => 'Commande encaissée avec succès.',
