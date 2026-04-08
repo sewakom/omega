@@ -849,8 +849,8 @@ class TicketPrintService
         $pdf->MultiCell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance'), 0, 'C');
         
         $pdf->SetFont('Arial', '', 7);
-        $pdf->Cell(0, 4, 'Generé le ' . now()->format('d/m/Y à H:i'), 0, 1, 'C');
-        $pdf->Cell(0, 4, 'Certifié par Omega POS', 0, 1, 'C');
+        $pdf->Cell(0, 4, utf8_decode('Généré le ' . now()->format('d/m/Y à H:i')), 0, 1, 'C');
+        $pdf->Cell(0, 4, utf8_decode('Certifié par smartflow POS'), 0, 1, 'C');
 
         return $pdf->Output('S');
     }

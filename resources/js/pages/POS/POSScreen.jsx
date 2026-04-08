@@ -12,6 +12,20 @@ const POSScreen = () => {
     const [orderType, setOrderType] = useState('dine_in'); // dine_in, takeaway, delivery, gozem
     const [customer, setCustomer] = useState({ name: '', phone: '' });
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = React.useRef(false);
+    
+    // Suivi de l'ordre pour éviter la duplication en cas de ré-essai d'impression
+    const [createdOrderId, setCreatedOrderId] = useState(null);
+    const [createdOrderItems, setCreatedOrderItems] = useState(null);
+
+    // Réinitialise le suivi si l'utilisateur modifie son panier
+    useEffect(() => {
+        if (createdOrderId) {
+            setCreatedOrderId(null);
+            setCreatedOrderItems(null);
+        }
+    }, [cart, customer, orderType, selectedTable]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -65,29 +79,62 @@ const POSScreen = () => {
 
     const submitOrder = async () => {
         if (cart.length === 0) return alert('Panier vide !');
+        if (isSubmittingRef.current) return;
+        
+        isSubmittingRef.current = true;
+        setIsSubmitting(true);
         try {
-            const resp = await axios.post('/api/orders', {
-                type: orderType,
-                table_id: selectedTable,
-                customer_name: customer.name,
-                customer_phone: customer.phone,
-                items: cart.map(i => ({
-                    product_id: i.product_id,
-                    quantity: i.quantity,
-                    notes: i.notes
-                }))
-            });
+            // Vérifier si une session de caisse est ouverte
+            const sessionResp = await axios.get('/api/cash-sessions/current');
+            if (!sessionResp.data) {
+                alert("Impossible d'envoyer en cuisine : Veuillez d'abord ouvrir une session de caisse !");
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
+                return;
+            }
 
-            // Envoi en cuisine & Impression IP automatique
-            const sendResp = await axios.post(`/api/orders/${resp.data.id}/send-to-kitchen`, {
-                item_ids: resp.data.items.map(i => i.id)
-            });
+            let orderId = createdOrderId;
+            let orderItems = createdOrderItems;
 
-            alert(`Commande ${resp.data.order_number} créée ! ${sendResp.data.message || ''}`);
-            setCart([]);
-            setCustomer({ name: '', phone: '' });
+            if (!orderId) {
+                const resp = await axios.post('/api/orders', {
+                    type: orderType,
+                    table_id: selectedTable,
+                    customer_name: customer.name,
+                    customer_phone: customer.phone,
+                    items: cart.map(i => ({
+                        product_id: i.product_id,
+                        quantity: i.quantity,
+                        notes: i.notes
+                    }))
+                });
+                orderId = resp.data.id;
+                orderItems = resp.data.items;
+                setCreatedOrderId(orderId);
+                setCreatedOrderItems(orderItems);
+            }
+
+            try {
+                const sendResp = await axios.post(`/api/orders/${orderId}/send-to-kitchen`, {
+                    item_ids: orderItems.map(i => i.id)
+                });
+                alert(`Commande ${orderId} traitée ! ${sendResp.data.message || ''}`);
+                
+                // Seulement si ça a réussi, on vide le panier.
+                setCart([]);
+                setCustomer({ name: '', phone: '' });
+                setCreatedOrderId(null);
+                setCreatedOrderItems(null);
+
+            } catch (printErr) {
+                alert(`Commande enregistrée en système, mais l'envoi en cuisine a échoué: ` + (printErr.response?.data?.message || printErr.message) + `\n\nVous pouvez cliquer à nouveau sur ENVOYER pour réessayer l'impression de cette même commande.`);
+                // Le panier N'EST PAS vidé. Le bouton reste cliquable pour relancer l'impression.
+            }
         } catch (err) {
-            alert('Erreur: ' + (err.response?.data?.message || err.message));
+            alert('Erreur lors de la création de la commande: ' + (err.response?.data?.message || err.message));
+        } finally {
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
         }
     };
 
@@ -226,12 +273,12 @@ const POSScreen = () => {
                         </button>
                         <button 
                          onClick={submitOrder}
-                         disabled={cart.length === 0}
+                         disabled={cart.length === 0 || isSubmitting}
                          className={`flex flex-col items-center justify-center gap-1 py-4 rounded-3xl font-black uppercase tracking-widest text-[10px] transition-all shadow-2xl shadow-orange-100 ${
-                             cart.length > 0 ? 'bg-orange-600 text-white hover:bg-orange-700 active:scale-95' : 'bg-slate-50 text-slate-300 grayscale pointer-events-none'
+                             (cart.length > 0 && !isSubmitting) ? 'bg-orange-600 text-white hover:bg-orange-700 active:scale-95' : 'bg-slate-50 text-slate-300 grayscale pointer-events-none'
                          }`}
                         >
-                            <Send size={20} /> ENVOYER EN CUISINE
+                            <Send size={20} /> {isSubmitting ? 'ENVOI EN COURS...' : 'ENVOYER EN CUISINE'}
                         </button>
                     </div>
                 </div>
