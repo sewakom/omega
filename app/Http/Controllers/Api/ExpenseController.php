@@ -9,18 +9,17 @@ use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
-    /** Liste des dépenses (session courante ou toutes) */
     public function index(Request $request)
     {
-        $expenses = Expense::where('restaurant_id', $request->user()->restaurant_id)
+        $query = Expense::where('restaurant_id', $request->user()->restaurant_id)
             ->with('user:id,first_name,last_name', 'cashSession:id,opened_at')
             ->when($request->cash_session_id, fn($q) => $q->where('cash_session_id', $request->cash_session_id))
             ->when($request->date, fn($q) => $q->whereDate('created_at', $request->date))
             ->when($request->category, fn($q) => $q->where('category', $request->category))
-            ->latest()
-            ->paginate(30);
+            ->latest();
 
-        $total = $expenses->sum('amount');
+        $expenses = $request->cash_session_id ? $query->get() : $query->paginate(30);
+        $total = $request->cash_session_id ? $expenses->sum('amount') : Expense::where('restaurant_id', $request->user()->restaurant_id)->sum('amount');
 
         return response()->json([
             'data'  => $expenses,

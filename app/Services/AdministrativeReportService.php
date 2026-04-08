@@ -127,31 +127,40 @@ class AdministrativeReportService extends FPDF
         $this->Line($this->GetX(), $this->GetY(), $this->GetX() + 190, $this->GetY());
         $this->Ln(5);
 
-        $this->SetFont('Arial', '', 11);
-        
-        // On affiche bien la distinction pour que ca concorde avec l'interface
-        $this->Cell(95, 8, $this->s("Total Encaissé (Argent Collecté):"), 0, 0);
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(120, 8, $this->s("A. CHIFFRE D'AFFAIRES (Valeur des Ventes):"), 0, 0);
+        $caTotal = $this->data['restaurant_ca'] + $this->data['cake_revenue'];
         $this->SetFont('Arial', 'B', 12);
-        $this->Cell(95, 8, number_format($this->data['total_collected'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+        $this->Cell(70, 8, number_format($caTotal, 0, ',', ' ') . " FCFA", 0, 1, 'R');
         
         $this->SetFont('Arial', '', 11);
-        $this->Cell(95, 8, $this->s("- Dont Ventes Restaurant:"), 0, 0);
-        $this->Cell(95, 8, number_format($this->data['restaurant_ca'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+        $this->Cell(120, 8, $this->s("   - Ventes Restaurant / Cuisine:"), 0, 0);
+        $this->Cell(70, 8, number_format($this->data['restaurant_ca'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
 
-        $this->Cell(95, 8, $this->s("- Dont Ventes Gâteaux:"), 0, 0);
-        $this->Cell(95, 8, number_format($this->data['cake_revenue'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+        $this->Cell(120, 8, $this->s("   - Ventes Pâtisserie / Gâteaux:"), 0, 0);
+        $this->Cell(70, 8, number_format($this->data['cake_revenue'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
         
-        $this->Ln(3);
-        $this->Line($this->GetX() + 100, $this->GetY(), $this->GetX() + 190, $this->GetY());
-        $this->Ln(3);
+        $this->Ln(4);
+        
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(120, 8, $this->s("B. ARGENT COLLECTÉ (Total Encaissé en caisse):"), 0, 0);
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(70, 8, number_format($this->data['total_collected'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+        $this->SetFont('Arial', 'I', 9);
+        $this->Cell(190, 5, $this->s("   *Peut différer du C.A. en cas de crédits, ardoises, ou acomptes antérieurs.*"), 0, 1, 'L');
 
+        $this->Ln(4);
+        $this->Line($this->GetX() + 80, $this->GetY(), $this->GetX() + 190, $this->GetY());
+        $this->Ln(4);
+
+        $this->SetFont('Arial', '', 11);
         $this->Cell(95, 8, $this->s("Nombre de Commandes (Restaurant):"), 0, 0);
         $this->Cell(95, 8, $this->data['order_stats']->count ?? 0, 0, 1, 'R');
         
         $this->Cell(95, 8, $this->s("Total Couverts:"), 0, 0);
         $this->Cell(95, 8, $this->data['order_stats']->covers ?? 0, 0, 1, 'R');
 
-        $this->Ln(10);
+        $this->Ln(8);
     }
 
     private function renderPillarsBreakdown()
