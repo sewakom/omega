@@ -57,6 +57,7 @@ class DataExportService
     private function exportOrders($from, $to, $restaurantId, $path)
     {
         $handle = fopen($path, 'w');
+        fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
         fputcsv($handle, ['ID', 'Numero', 'Type', 'Statut', 'Client', 'Couverts', 'Sous-total', 'Remise', 'TVA', 'TOTAL', 'Cree le', 'Paye le']);
 
         Order::where('restaurant_id', $restaurantId)
@@ -86,6 +87,7 @@ class DataExportService
     private function exportItems($from, $to, $restaurantId, $path)
     {
         $handle = fopen($path, 'w');
+        fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
         fputcsv($handle, ['ID', 'Commande #', 'Article', 'Categorie', 'Destination', 'Quantite', 'P.U.', 'Sous-total', 'Statut', 'Date']);
 
         OrderItem::with(['order', 'product.category'])
@@ -113,6 +115,7 @@ class DataExportService
     private function exportPayments($from, $to, $restaurantId, $path)
     {
         $handle = fopen($path, 'w');
+        fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
         fputcsv($handle, ['ID', 'Commande #', 'Gateau #', 'Mode', 'Montant', 'Reference', 'Date']);
 
         Payment::with(['order', 'cakeOrder'])
@@ -141,16 +144,18 @@ class DataExportService
     private function exportCancellations($from, $to, $restaurantId, $path)
     {
         $handle = fopen($path, 'w');
-        fputcsv($handle, ['ID', 'Commande #', 'Motif', 'Par', 'Approuve par', 'Date']);
+        fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
+        fputcsv($handle, ['ID', 'Type', 'ID Objet', 'Motif', 'Par', 'Approuve par', 'Date']);
 
-        Cancellation::with(['order', 'requester', 'approver'])
-            ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
+        Cancellation::with(['requester', 'approver'])
+            ->where('restaurant_id', $restaurantId)
             ->whereBetween('created_at', [$from, $to])
             ->chunk(100, function ($cancellations) use ($handle) {
                 foreach ($cancellations as $c) {
                     fputcsv($handle, [
                         $c->id,
-                        $c->order->order_number ?? 'N/A',
+                        $c->cancellable_type,
+                        $c->cancellable_id,
                         $c->reason,
                         ($c->requester->first_name ?? '') . ' ' . ($c->requester->last_name ?? ''),
                         ($c->approver->first_name ?? '') . ' ' . ($c->approver->last_name ?? ''),
@@ -165,6 +170,7 @@ class DataExportService
     private function exportCakeOrders($from, $to, $restaurantId, $path)
     {
         $handle = fopen($path, 'w');
+        fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
         fputcsv($handle, ['ID', 'Numero', 'Client', 'Telephone', 'Date Recuperation', 'TOTAL', 'Encaisse', 'Statut', 'Cree le']);
 
         CakeOrder::where('restaurant_id', $restaurantId)
@@ -176,9 +182,9 @@ class DataExportService
                         $cake->order_number,
                         $cake->customer_name,
                         $cake->customer_phone,
-                        $cake->pickup_at ? Carbon::parse($cake->pickup_at)->format('d/m/Y H:i') : '',
+                        ($cake->delivery_date ? $cake->delivery_date->format('d/m/Y') : '') . ' ' . ($cake->delivery_time ?? ''),
                         $cake->total,
-                        $cake->paid_amount,
+                        $cake->advance_paid,
                         $cake->status,
                         $cake->created_at->format('d/m/Y H:i')
                     ]);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\DataExportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class ExportController extends Controller
@@ -36,8 +37,14 @@ class ExportController extends Controller
             return response()->download($zipPath)->deleteFileAfterSend(true);
             
         } catch (\Exception $e) {
+            Log::error('Export Error: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id,
+                'params' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
-                'message' => 'Erreur lors de l\'exportation: ' . $e->getMessage()
+                'message' => 'Erreur lors de l\'exportation de vos données.',
+                'debug' => $e->getMessage()
             ], 500);
         }
     }
