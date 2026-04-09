@@ -7,7 +7,10 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Cancellation;
 use App\Models\CakeOrder;
+use App\Models\CashSession;
+use App\Models\Expense;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DataExportService
@@ -27,6 +30,9 @@ class DataExportService
    <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
    <Interior ss:Color="#4F81BD" ss:Pattern="Solid"/>
   </Style>
+  <Style ss:ID="sTitle">
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="14" ss:Bold="1" ss:Color="#1F4E78"/>
+  </Style>
  </Styles>';
 
     public function exportToExcel(string $fromDate, string $toDate, int $restaurantId): string
@@ -40,13 +46,120 @@ class DataExportService
         $handle = fopen($filePath, 'w');
         fwrite($handle, $this->xmlHeader);
 
-        // 1. Sheet Orders
-        $this->addWorksheet($handle, 'Commandes', ['ID', 'Numero', 'Type', 'Statut', 'Client', 'Couverts', 'Sous-total', 'Remise', 'TVA', 'TOTAL', 'Cree le', 'Paye le'], function($chunkCallback) use ($restaurantId, $from, $to) {
+        // 1. Sheet Rapport (Synthèse financière)
+        $this->addWorksheet($handle, 'Rapport', ['Indicateur', 'Valeur'], function($cb) use ($restaurantId, $from, $to) {
+            $stats = Order::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->where('status', 'completed')
+                ->selectRaw('COUNT(*) as count, SUM(total) as total, SUM(discount_amount) as discount, SUM(vat_amount) as vat')
+                ->first();
+
+            $cb(['--- SYNTHESE DES VENTES ---', '']);
+            $cb(['Période', $from->format('d/m/Y') . ' au ' . $to->format('d/m/Y')]);
+            $cb(['Nombre de commandes validées', $stats->count ?? 0]);
+            $cb(['Chiffre d\'Affaires TOTAL (TTC)', $stats->total ?? 0]);
+            $cb(['Total TVA collectée', $stats->vat ?? 0]);
+            $cb(['Total Remises accordées', $stats->discount ?? 0]);
+            
+            $cb(['', '']);
+            $cb(['--- REPARTITION DES PAIEMENTS ---', '']);
+            $payments = Payment::whereBetween('created_at', [$from, $to])
+                ->where(fn($q) => $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
+                                    ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId)))
+                ->groupBy('method')
+                ->selectRaw('method, SUM(amount) as total')
+                ->get();
+
+            foreach ($payments as $p) {
+                $cb(['Total ' . strtoupper($p->method), $p->total]);
+            }
+
+            $cb(['', '']);
+            $cb(['--- SYNTHESE CAISSE & DEPENSES ---', '']);
+            $totalExpenses = Expense::where('restaurant_id', $restaurantId)
+                ->whereBetween('date', [$from, $to])
+                ->sum('amount');
+            $cb(['Total Dépenses enregistrées', $totalExpenses]);
+
+            $cb(['', '']);
+            $cb(['--- ANNULATIONS ---', '']);
+            $cancelled = Order::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->where('status', 'cancelled')
+                ->count();
+            $cb(['Nombre de commandes annulées', $cancelled]);
+        });
+
+        // 2. Sheet Analyse
+        $this->addWorksheet($handle, 'Analyse', ['Rang', 'Article', 'Catégorie', 'Quantité Vendue', 'CA Généré'], function($cb) use ($restaurantId, $from, $to) {
+            $topItems = OrderItem::with(['product.category'])
+                ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereBetween('created_at', [$from, $to]))
+                ->groupBy('product_id')
+                ->selectRaw('product_id, SUM(quantity) as qty, SUM(subtotal) as total')
+                ->orderByDesc('total')
+                ->limit(30)
+                ->get();
+
+            $rank = 1;
+            foreach ($topItems as $item) {
+                $cb([
+                    $rank++,
+                    $item->product->name ?? 'Article inconnu',
+                    $item->product->category->name ?? 'N/A',
+                    $item->qty,
+                    $item->total
+                ]);
+            }
+        });
+
+        // 3. Sheet Sessions Caisse
+        $this->addWorksheet($handle, 'Caisse', ['ID', 'Caissier', 'Ouverte le', 'Fermée le', 'Ouverture', 'Fermeture Attendue', 'Fermeture Réelle', 'Écart', 'Statut'], function($cb) use ($restaurantId, $from, $to) {
+            CashSession::with('user')
+                ->where('restaurant_id', $restaurantId)
+                ->whereBetween('opened_at', [$from, $to])
+                ->chunk(100, function($sessions) use ($cb) {
+                    foreach ($sessions as $s) {
+                        $cb([
+                            $s->id,
+                            ($s->user->first_name ?? '') . ' ' . ($s->user->last_name ?? ''),
+                            $s->opened_at->format('d/m/Y H:i'),
+                            $s->closed_at ? $s->closed_at->format('d/m/Y H:i') : '-',
+                            $s->opening_balance,
+                            $s->expected_closing_balance,
+                            $s->actual_closing_balance,
+                            $s->difference,
+                            $s->status
+                        ]);
+                    }
+                });
+        });
+
+        // 4. Sheet Dépenses
+        $this->addWorksheet($handle, 'Depenses', ['Date', 'Libellé', 'Catégorie', 'Montant', 'Note', 'Par'], function($cb) use ($restaurantId, $from, $to) {
+            Expense::with('user')
+                ->where('restaurant_id', $restaurantId)
+                ->whereBetween('date', [$from, $to])
+                ->chunk(100, function($expenses) use ($cb) {
+                    foreach ($expenses as $e) {
+                        $cb([
+                            $e->date->format('d/m/Y'),
+                            $e->description,
+                            $e->category,
+                            $e->amount,
+                            $e->notes,
+                            $e->user->first_name ?? 'N/A'
+                        ]);
+                    }
+                });
+        });
+
+        // 5. Sheet Orders
+        $this->addWorksheet($handle, 'Commandes', ['ID', 'Numero', 'Type', 'Statut', 'Client', 'Couverts', 'Sous-total', 'Remise', 'TVA', 'TOTAL', 'Cree le', 'Paye le'], function($cb) use ($restaurantId, $from, $to) {
             Order::where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
-                ->chunk(100, function($orders) use ($chunkCallback) {
+                ->chunk(100, function($orders) use ($cb) {
                     foreach ($orders as $o) {
-                        $chunkCallback([
+                        $cb([
                             $o->id, $o->order_number, $o->type, $o->status, $o->customer_name, $o->covers,
                             $o->subtotal, $o->discount_amount, $o->vat_amount, $o->total,
                             $o->created_at->format('d/m/Y H:i'),
@@ -56,79 +169,52 @@ class DataExportService
                 });
         });
 
-        // 2. Sheet Items
-        $this->addWorksheet($handle, 'Articles Vendus', ['ID', 'Commande #', 'Article', 'Categorie', 'Destination', 'Quantite', 'P.U.', 'Sous-total', 'Statut', 'Date'], function($chunkCallback) use ($restaurantId, $from, $to) {
-            OrderItem::with(['order', 'product.category'])
+        // 6. Detailed Items
+        $this->addWorksheet($handle, 'Détail Articles', ['ID', 'Commande #', 'Article', 'Quantite', 'Sous-total', 'Date'], function($cb) use ($restaurantId, $from, $to) {
+            OrderItem::with(['order', 'product'])
                 ->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId)->whereBetween('created_at', [$from, $to]))
-                ->chunk(100, function($items) use ($chunkCallback) {
+                ->chunk(100, function($items) use ($cb) {
                     foreach ($items as $item) {
-                        $chunkCallback([
+                        $cb([
                             $item->id,
                             $item->order->order_number ?? 'N/A',
                             $item->product->name ?? 'N/A',
-                            $item->product->category->name ?? 'N/A',
-                            $item->product->category->destination ?? 'N/A',
                             $item->quantity,
-                            $item->unit_price,
                             $item->subtotal,
-                            $item->status,
                             $item->created_at->format('d/m/Y H:i')
                         ]);
                     }
                 });
         });
 
-        // 3. Sheet Payments
-        $this->addWorksheet($handle, 'Paiements', ['ID', 'Commande #', 'Gateau #', 'Mode', 'Montant', 'Reference', 'Date'], function($chunkCallback) use ($restaurantId, $from, $to) {
-            Payment::with(['order', 'cakeOrder'])
-                ->where(function($q) use ($restaurantId) {
-                    $q->whereHas('order', fn($q) => $q->where('restaurant_id', $restaurantId))
-                      ->orWhereHas('cakeOrder', fn($q) => $q->where('restaurant_id', $restaurantId));
-                })
-                ->whereBetween('created_at', [$from, $to])
-                ->chunk(100, function($payments) use ($chunkCallback) {
-                    foreach ($payments as $p) {
-                        $chunkCallback([
-                            $p->id,
-                            $p->order->order_number ?? '',
-                            $p->cakeOrder->order_number ?? '',
-                            $p->method,
-                            $p->amount,
-                            $p->reference,
-                            $p->created_at->format('d/m/Y H:i')
-                        ]);
-                    }
-                });
-        });
-
-        // 4. Sheet Cancellations
-        $this->addWorksheet($handle, 'Annulations', ['ID', 'Type', 'ID Objet', 'Motif', 'Par', 'Approuve par', 'Date'], function($chunkCallback) use ($restaurantId, $from, $to) {
-            Cancellation::with(['requester', 'approver'])
-                ->where('restaurant_id', $restaurantId)
-                ->whereBetween('created_at', [$from, $to])
-                ->chunk(100, function($cancellations) use ($chunkCallback) {
-                    foreach ($cancellations as $c) {
-                        $chunkCallback([
-                            $c->id, $c->cancellable_type, $c->cancellable_id, $c->reason,
-                            ($c->requester->first_name ?? '') . ' ' . ($c->requester->last_name ?? ''),
-                            ($c->approver->first_name ?? '') . ' ' . ($c->approver->last_name ?? ''),
-                            $c->created_at->format('d/m/Y H:i')
-                        ]);
-                    }
-                });
-        });
-
-        // 5. Sheet Cake Orders
-        $this->addWorksheet($handle, 'Gâteaux', ['ID', 'Numero', 'Client', 'Telephone', 'Date Recuperation', 'TOTAL', 'Encaisse', 'Statut', 'Cree le'], function($chunkCallback) use ($restaurantId, $from, $to) {
+        // 7. Gâteaux
+        $this->addWorksheet($handle, 'Gateaux', ['Numero', 'Client', 'Date Recuperation', 'TOTAL', 'Encaisse', 'Statut'], function($cb) use ($restaurantId, $from, $to) {
             CakeOrder::where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
-                ->chunk(100, function($cakes) use ($chunkCallback) {
+                ->chunk(100, function($cakes) use ($cb) {
                     foreach ($cakes as $cake) {
-                        $chunkCallback([
-                            $cake->id, $cake->order_number, $cake->customer_name, $cake->customer_phone,
+                        $cb([
+                            $cake->order_number, $cake->customer_name,
                             ($cake->delivery_date ? $cake->delivery_date->format('d/m/Y') : '') . ' ' . ($cake->delivery_time ?? ''),
-                            $cake->total, $cake->advance_paid, $cake->status,
-                            $cake->created_at->format('d/m/Y H:i')
+                            $cake->total, $cake->advance_paid, $cake->status
+                        ]);
+                    }
+                });
+        });
+
+        // 8. Logs
+        $this->addWorksheet($handle, 'Logs Activité', ['ID', 'Date', 'Action', 'Sujet', 'Utilisateur'], function($cb) use ($from, $to) {
+            DB::table('activity_log')
+                ->whereBetween('created_at', [$from, $to])
+                ->orderByDesc('created_at')
+                ->chunk(100, function($logs) use ($cb) {
+                    foreach ($logs as $log) {
+                        $cb([
+                            $log->id,
+                            Carbon::parse($log->created_at)->format('d/m/Y H:i'),
+                            $log->description,
+                            basename(str_replace('\\', '/', $log->subject_type ?? 'N/A')),
+                            'UID: ' . ($log->causer_id ?? 'Système')
                         ]);
                     }
                 });
@@ -144,14 +230,12 @@ class DataExportService
     {
         fwrite($handle, '<Worksheet ss:Name="' . $this->escapeXml($name) . '"><Table>');
         
-        // Header
         fwrite($handle, '<Row>');
         foreach ($headers as $h) {
             fwrite($handle, '<Cell ss:StyleID="sHeader"><Data ss:Type="String">' . $this->escapeXml($h) . '</Data></Cell>');
         }
         fwrite($handle, '</Row>');
 
-        // Data
         $queryCallback(function($row) use ($handle) {
             fwrite($handle, '<Row>');
             foreach ($row as $value) {

@@ -48,4 +48,62 @@ class ExportController extends Controller
             ], 500);
         }
     }
+
+    public function purge(Request $request)
+    {
+        $request->validate([
+            'from' => 'required|date',
+            'to'   => 'required|date|after_or_equal:from',
+            'confirm_text' => 'required|string|in:EFFACER',
+        ]);
+
+        $restaurantId = $request->user()->restaurant_id;
+        $from = \Carbon\Carbon::parse($request->from)->startOfDay();
+        $to = \Carbon\Carbon::parse($request->to)->endOfDay();
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            // Delete Orders and related data (Manual force delete because of SoftDeletes)
+            $orders = \App\Models\Order::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->get();
+            
+            foreach ($orders as $order) {
+                $order->items()->forceDelete();
+                $order->payments()->forceDelete();
+                $order->logs()->delete();
+                $order->cancellations()->forceDelete();
+                $order->forceDelete();
+            }
+
+            // Cake Orders
+            \App\Models\CakeOrder::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->forceDelete();
+            
+            // Cash Sessions
+            \App\Models\CashSession::where('restaurant_id', $restaurantId)
+                ->whereBetween('opened_at', [$from, $to])
+                ->forceDelete();
+
+            // Expenses
+            \App\Models\Expense::where('restaurant_id', $restaurantId)
+                ->whereBetween('date', [$from, $to])
+                ->delete();
+
+            // Activity Logs for this period
+            \Illuminate\Support\Facades\DB::table('activity_log')
+                ->where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json(['message' => 'Les données de la période sélectionnée ont été définitivement effacées.']);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Log::error('Purge Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Erreur lors de la purge : ' . $e->getMessage()], 500);
+        }
+    }
 }

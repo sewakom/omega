@@ -173,6 +173,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('by-category',      [Api\ReportController::class, 'byCategory']);
         Route::get('cash-summary',     [Api\ReportController::class, 'cashSummary']);
         Route::get('export-all',       [Api\ExportController::class, 'export']);
+        Route::post('purge-data',      [Api\ExportController::class, 'purge']);
     });
 
     // Reçus & Tickets
