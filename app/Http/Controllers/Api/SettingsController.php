@@ -15,14 +15,15 @@ class SettingsController extends Controller
     {
         abort_unless($request->user()->isManager(), 403);
         $restaurant = $request->user()->restaurant;
-        $request->validate(['name' => 'sometimes|string|max:200', 'address' => 'nullable|string', 'phone' => 'nullable|string|max:30', 'email' => 'nullable|email', 'vat_number' => 'nullable|string|max:50', 'currency' => 'in:XOF,EUR,USD,GHS,NGN', 'timezone' => 'nullable|string', 'logo' => 'nullable|image|max:2048']);
-
-        if ($request->hasFile('logo')) {
-            if ($restaurant->logo) Storage::disk('public')->delete($restaurant->logo);
-            $request->merge(['logo' => $request->file('logo')->store("restaurants/{$restaurant->id}", 'public')]);
+        $data = $request->only(['name', 'address', 'phone', 'email', 'vat_number', 'currency', 'timezone', 'logo']);
+        
+        if ($request->has('receipt_subtitle')) {
+            $settings = $restaurant->settings ?? [];
+            $settings['receipt_subtitle'] = $request->input('receipt_subtitle');
+            $data['settings'] = $settings;
         }
 
-        $restaurant->update($request->only(['name', 'address', 'phone', 'email', 'vat_number', 'currency', 'timezone', 'logo']));
+        $restaurant->update($data);
         return response()->json($restaurant);
     }
 
