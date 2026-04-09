@@ -204,7 +204,7 @@ class DataExportService
 
         // 8. Logs
         $this->addWorksheet($handle, 'Logs Activité', ['ID', 'Date', 'Action', 'Sujet', 'Utilisateur'], function($cb) use ($from, $to) {
-            DB::table('activity_log')
+            DB::table('activity_logs')
                 ->whereBetween('created_at', [$from, $to])
                 ->orderByDesc('created_at')
                 ->chunk(100, function($logs) use ($cb) {
