@@ -114,7 +114,11 @@ class TicketPrintService
   </div>
   {$orderNote}
   {$customerInfo}
-  <div class='footer-name'>{$restaurant->name} — Omega POS</div>
+  <div class='footer-name'>
+    {$restaurant->name}
+    " . (data_get($restaurant->settings, 'receipt_subtitle') ? "<br><span style='font-size:8px;font-weight:normal'>" . data_get($restaurant->settings, 'receipt_subtitle') . "</span>" : "") . "
+    <br>Omega POS
+  </div>
 </body>
 </html>";
     }
@@ -212,6 +216,7 @@ class TicketPrintService
   {$logoHtml}
   <div class='header'>
     <div class='resto-name'>{$restaurant->name}</div>
+    " . (data_get($restaurant->settings, 'receipt_subtitle') ? "<div style='font-size:10px; font-weight:bold; margin-bottom:2px; color:#555;'>" . data_get($restaurant->settings, 'receipt_subtitle') . "</div>" : "") . "
     " . ($restoAddress ? "<div style='font-size:9px'>{$restoAddress}</div>" : "") . "
     " . ($restaurant->phone ? "<div style='font-size:9px'>Tél: {$restaurant->phone}</div>" : "") . "
     <div style='font-size:9px'>{$date}</div>
@@ -313,8 +318,8 @@ class TicketPrintService
             ? "<img src='{$restaurant->logo_url}' style='max-height:25mm;'>" 
             : "";
 
-        $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance';
-        $subtitle    = $restaurant->settings['receipt_subtitle'] ?? null;
+        $thanksMsg   = data_get($restaurant->settings, 'thank_you_message') ?? 'Merci pour votre confiance';
+        $subtitle    = data_get($restaurant->settings, 'receipt_subtitle');
 
         return "<!DOCTYPE html>
 <html>
@@ -418,7 +423,7 @@ class TicketPrintService
         $pdf->SetTextColor(50, 50, 100);
         $pdf->Cell(80, 10, 'FACTURE', 0, 1, 'R');
 
-        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        $subtitle = data_get($restaurant->settings, 'receipt_subtitle');
         if ($subtitle) {
             $pdf->SetFont('Helvetica', 'B', 11);
             $pdf->SetTextColor(80, 80, 80);
@@ -633,6 +638,16 @@ class TicketPrintService
         $pdf->SetMargins(5, 5, 5);
         $pdf->AddPage();
         
+        // Entête Restaurant
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(0, 5, utf8_decode(strtoupper($order->restaurant->name)), 0, 1, 'C');
+        $subtitle = data_get($order->restaurant->settings, 'receipt_subtitle');
+        if ($subtitle) {
+            $pdf->SetFont('Helvetica', 'BI', 8);
+            $pdf->Cell(0, 4, utf8_decode($subtitle), 0, 1, 'C');
+        }
+        $pdf->Ln(2);
+
         // Entête Destination
         $pdf->SetFont('Helvetica', 'B', 16);
         $pdf->Cell(0, 8, utf8_decode($this->routing->destinationLabel($destination)), 0, 1, 'C');
@@ -727,7 +742,7 @@ class TicketPrintService
             $pdf->Cell(0, 10, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
         }
 
-        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        $subtitle = data_get($restaurant->settings, 'receipt_subtitle');
         if ($subtitle) {
             $pdf->SetFont('Arial', 'B', 10);
             $pdf->Cell(0, 5, utf8_decode(strtoupper($subtitle)), 0, 1, 'C');
@@ -900,7 +915,7 @@ class TicketPrintService
         $pdf->SetFont('Arial', 'B', 12);
         $pdf->Cell(0, 10, utf8_decode('FACTURE ARDOISE'), 0, 1, 'R');
 
-        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        $subtitle = data_get($restaurant->settings, 'receipt_subtitle');
         if ($subtitle) {
             $pdf->SetFont('Arial', 'B', 10);
             $pdf->SetTextColor(80, 80, 80);
