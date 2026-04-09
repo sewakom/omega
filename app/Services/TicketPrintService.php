@@ -314,6 +314,7 @@ class TicketPrintService
             : "";
 
         $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance';
+        $subtitle    = $restaurant->settings['receipt_subtitle'] ?? null;
 
         return "<!DOCTYPE html>
 <html>
@@ -344,6 +345,7 @@ class TicketPrintService
   <div class='header'>
     <div class='resto-info'>
       <h1>{$restaurant->name}</h1>
+      " . ($subtitle ? "<div style='font-size:12px; font-weight:bold; margin-bottom:5px; color:#555;'>{$subtitle}</div>" : "") . "
       " . ($restoAddr ? "<div>{$restoAddr}</div>" : "") . "
       " . ($restoPhone ? "<div>Tél: {$restoPhone}</div>" : "") . "
       " . ($restaurant->email ? "<div>{$restaurant->email}</div>" : "") . "
@@ -415,6 +417,13 @@ class TicketPrintService
         $pdf->SetFont('Helvetica', 'B', 18);
         $pdf->SetTextColor(50, 50, 100);
         $pdf->Cell(80, 10, 'FACTURE', 0, 1, 'R');
+
+        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        if ($subtitle) {
+            $pdf->SetFont('Helvetica', 'B', 11);
+            $pdf->SetTextColor(80, 80, 80);
+            $pdf->Cell(100, 6, utf8_decode(strtoupper($subtitle)), 0, 1);
+        }
         $pdf->SetTextColor(0, 0, 0);
 
         // Restaurant Info
@@ -717,6 +726,12 @@ class TicketPrintService
         } else {
             $pdf->Cell(0, 10, utf8_decode(strtoupper($restaurant->name)), 0, 1, 'C');
         }
+
+        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        if ($subtitle) {
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->Cell(0, 5, utf8_decode(strtoupper($subtitle)), 0, 1, 'C');
+        }
         
         $pdf->SetFont('Arial', 'B', 9);
         $pdf->Cell(0, 5, $order->created_at->format('d/m/Y H:i'), 0, 1, 'C');
@@ -884,6 +899,14 @@ class TicketPrintService
         $pdf->Cell(120, 10, utf8_decode(strtoupper($restaurant->name)), 0, 0);
         $pdf->SetFont('Arial', 'B', 12);
         $pdf->Cell(0, 10, utf8_decode('FACTURE ARDOISE'), 0, 1, 'R');
+
+        $subtitle = $restaurant->settings['receipt_subtitle'] ?? '';
+        if ($subtitle) {
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->SetTextColor(80, 80, 80);
+            $pdf->Cell(120, 6, utf8_decode(strtoupper($subtitle)), 0, 1);
+        }
+        $pdf->SetTextColor(0);
         
         $pdf->SetFont('Arial', '', 9);
         $pdf->SetTextColor(100, 100, 100);
