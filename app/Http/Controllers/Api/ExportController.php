@@ -63,35 +63,56 @@ class ExportController extends Controller
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            // Delete Orders and related data (Manual force delete because of SoftDeletes)
-            $orders = \App\Models\Order::where('restaurant_id', $restaurantId)
+            // 1. Récupérer les IDs des objets à supprimer pour cette période
+            $orderIds = \App\Models\Order::where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
-                ->get();
-            
-            foreach ($orders as $order) {
-                $order->items()->forceDelete();
-                $order->payments()->forceDelete();
-                $order->logs()->delete();
-                $order->cancellations()->forceDelete();
-                $order->forceDelete();
+                ->pluck('id');
+
+            $cakeOrderIds = \App\Models\CakeOrder::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->pluck('id');
+
+            // 2. Supprimer les données liées aux Commandes (En commençant par les enfants profonds)
+            if ($orderIds->isNotEmpty()) {
+                $orderItemIds = \App\Models\OrderItem::whereIn('order_id', $orderIds)->pluck('id');
+                
+                if ($orderItemIds->isNotEmpty()) {
+                    \App\Models\OrderItemModifier::whereIn('order_item_id', $orderItemIds)->delete();
+                    \App\Models\OrderItem::whereIn('id', $orderItemIds)->forceDelete();
+                }
+
+                \App\Models\Payment::whereIn('order_id', $orderIds)->forceDelete();
+                \App\Models\OrderLog::whereIn('order_id', $orderIds)->delete();
+                \App\Models\Delivery::whereIn('order_id', $orderIds)->delete();
+                \Illuminate\Support\Facades\DB::table('customer_tab_orders')->whereIn('order_id', $orderIds)->delete();
+                \App\Models\Cancellation::where('cancellable_type', \App\Models\Order::class)
+                    ->whereIn('cancellable_id', $orderIds)
+                    ->forceDelete();
+                
+                // Enfin, supprimer les commandes elles-mêmes
+                \App\Models\Order::whereIn('id', $orderIds)->forceDelete();
             }
 
-            // Cake Orders
-            \App\Models\CakeOrder::where('restaurant_id', $restaurantId)
-                ->whereBetween('created_at', [$from, $to])
-                ->forceDelete();
-            
-            // Cash Sessions
-            \App\Models\CashSession::where('restaurant_id', $restaurantId)
-                ->whereBetween('opened_at', [$from, $to])
-                ->forceDelete();
+            // 3. Supprimer les données liées aux Gâteaux
+            if ($cakeOrderIds->isNotEmpty()) {
+                \App\Models\Payment::whereIn('cake_order_id', $cakeOrderIds)->forceDelete();
+                \App\Models\Cancellation::where('cancellable_type', \App\Models\CakeOrder::class)
+                    ->whereIn('cancellable_id', $cakeOrderIds)
+                    ->forceDelete();
+                
+                \App\Models\CakeOrder::whereIn('id', $cakeOrderIds)->forceDelete();
+            }
 
-            // Expenses
+            // 4. Supprimer les Sessions de Caisse et Dépenses
             \App\Models\Expense::where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
                 ->delete();
 
-            // Activity Logs for this period
+            \App\Models\CashSession::where('restaurant_id', $restaurantId)
+                ->whereBetween('opened_at', [$from, $to])
+                ->forceDelete();
+
+            // 5. Nettoyer les logs d'activité
             \Illuminate\Support\Facades\DB::table('activity_log')
                 ->where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
