@@ -193,10 +193,6 @@ class OrderController extends Controller
         $tickets = [];
         $destinations = ['kitchen', 'bar', 'pizza'];
 
-        /** @var \App\Services\EscPosPrintService $escPosService */
-        $escPosService = app(\App\Services\EscPosPrintService::class);
-        $printingErrors = [];
-
         foreach ($destinations as $dest) {
             $html = $ticketService->kitchenTicketHtml($order, $dest);
             if ($html) {
@@ -204,19 +200,10 @@ class OrderController extends Controller
                     'destination' => $dest,
                     'html' => $html
                 ];
-
-                // Essai d'impression IP thermique pour LES NOUVEAUX ARTICLES UNIQUEMENT
-                $result = $escPosService->printKitchenTicket($order, $dest, $items, false);
-                if (!$result['success']) {
-                    $printingErrors[] = strtoupper($dest) . " ({$result['message']})";
-                }
             }
         }
 
         $message = 'Commande envoyée en cuisine.';
-        if (!empty($printingErrors)) {
-            $message .= ' (Erreur impression : ' . implode(', ', $printingErrors) . ')';
-        }
 
         return response()->json([
             'message' => $message,
