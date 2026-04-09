@@ -77,7 +77,7 @@ class DataExportService
             $cb(['', '']);
             $cb(['--- SYNTHESE CAISSE & DEPENSES ---', '']);
             $totalExpenses = Expense::where('restaurant_id', $restaurantId)
-                ->whereBetween('date', [$from, $to])
+                ->whereBetween('created_at', [$from, $to])
                 ->sum('amount');
             $cb(['Total Dépenses enregistrées', $totalExpenses]);
 
@@ -138,11 +138,11 @@ class DataExportService
         $this->addWorksheet($handle, 'Depenses', ['Date', 'Libellé', 'Catégorie', 'Montant', 'Note', 'Par'], function($cb) use ($restaurantId, $from, $to) {
             Expense::with('user')
                 ->where('restaurant_id', $restaurantId)
-                ->whereBetween('date', [$from, $to])
+                ->whereBetween('created_at', [$from, $to])
                 ->chunk(100, function($expenses) use ($cb) {
                     foreach ($expenses as $e) {
                         $cb([
-                            $e->date->format('d/m/Y'),
+                            $e->created_at->format('d/m/Y'),
                             $e->description,
                             $e->category,
                             $e->amount,

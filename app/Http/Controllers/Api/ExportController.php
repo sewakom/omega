@@ -88,7 +88,7 @@ class ExportController extends Controller
 
             // Expenses
             \App\Models\Expense::where('restaurant_id', $restaurantId)
-                ->whereBetween('date', [$from, $to])
+                ->whereBetween('created_at', [$from, $to])
                 ->delete();
 
             // Activity Logs for this period
