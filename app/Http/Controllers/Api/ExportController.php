@@ -113,7 +113,7 @@ class ExportController extends Controller
                 ->forceDelete();
 
             // 5. Nettoyer les logs d'activité
-            \Illuminate\Support\Facades\DB::table('activity_log')
+            \Illuminate\Support\Facades\DB::table('activity_logs')
                 ->where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
                 ->delete();
