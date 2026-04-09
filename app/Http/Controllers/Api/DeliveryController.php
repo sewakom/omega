@@ -17,6 +17,13 @@ class DeliveryController extends Controller
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->driver_id, fn($q) => $q->where('driver_id', $request->driver_id))
             ->when($request->date, fn($q) => $q->whereDate('created_at', $request->date))
+            ->when($request->search, function($q) use ($request) {
+                $q->where(function($sub) use ($request) {
+                    $sub->where('customer_name', 'like', "%{$request->search}%")
+                        ->orWhere('customer_phone', 'like', "%{$request->search}%")
+                        ->orWhereHas('order', fn($o) => $o->where('order_number', 'like', "%{$request->search}%"));
+                });
+            })
             ->latest()->paginate(20);
         return response()->json($deliveries);
     }
