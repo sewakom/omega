@@ -21,6 +21,8 @@ class PaymentController extends Controller
             'method'       => 'required|in:cash,card,wave,orange_money,momo,moov,mixx,other',
             'reference'    => 'nullable|string',
             'amount_given' => 'nullable|numeric|min:0',
+            'customer_name' => 'nullable|string|max:150',
+            'customer_phone' => 'nullable|string|max:20',
         ]);
 
         $order = Order::findOrFail($request->order_id);
@@ -37,6 +39,14 @@ class PaymentController extends Controller
             $changeGiven = null;
             if ($request->input('method') === 'cash' && $request->amount_given) {
                 $changeGiven = max(0, $request->amount_given - $request->amount);
+            }
+
+            // Update customer name if provided during payment
+            if ($request->customer_name) {
+                $order->update([
+                    'customer_name' => $request->customer_name,
+                    'customer_phone' => $request->customer_phone ?? $order->customer_phone
+                ]);
             }
 
             $payment = Payment::create([
@@ -89,6 +99,7 @@ class PaymentController extends Controller
             'payments.*.amount' => 'required|numeric|min:0.01',
             'payments.*.method' => 'required|in:cash,card,wave,orange_money,momo,moov,mixx,other',
             'payments.*.reference' => 'nullable|string',
+            'customer_name' => 'nullable|string|max:150',
         ]);
 
         $order = Order::findOrFail($request->order_id);
@@ -113,7 +124,11 @@ class PaymentController extends Controller
                 ]);
             }
 
-            $order->update(['status' => 'paid', 'paid_at' => now(), 'cashier_id' => Auth::id()]);
+            $updateData = ['status' => 'paid', 'paid_at' => now(), 'cashier_id' => Auth::id()];
+            if ($request->customer_name) {
+                $updateData['customer_name'] = $request->customer_name;
+            }
+            $order->update($updateData);
 
             if ($order->table_id) {
                 $order->table->update(['status' => 'free', 'occupied_since' => null, 'assigned_user_id' => null]);

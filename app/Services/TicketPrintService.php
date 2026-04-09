@@ -134,7 +134,7 @@ class TicketPrintService
 
         $itemsHtml = '';
         foreach ($items as $item) {
-            $subtotal  = number_format($item->quantity * $item->unit_price, 0, ',', ' ');
+            $subtotal  = number_format((float) ($item->quantity * $item->unit_price), 0, ',', ' ');
             $itemsHtml .= "
             <div class='line'>
                 <span>{$item->quantity}x {$item->product->name}</span>
@@ -253,7 +253,7 @@ class TicketPrintService
         $itemsHtml = '';
         $i = 1;
         foreach ($items as $item) {
-            $subtotal = number_format($item->quantity * $item->unit_price, 0, ',', ' ');
+            $subtotal = number_format((float) ($item->quantity * $item->unit_price), 0, ',', ' ');
             $price    = number_format($item->unit_price, 0, ',', ' ');
             $itemsHtml .= "
             <tr>
@@ -310,9 +310,7 @@ class TicketPrintService
             : '';
 
         $customerBlock = '';
-        if ($order->customer_name) {
-            $customerBlock = "<div class='customer-block'><strong>Client:</strong> {$order->customer_name} | {$order->customer_phone}</div>";
-        }
+        // Customer name hidden on invoices as requested
 
         $logoHtml = ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo)))
             ? "<img src='{$restaurant->logo_url}' style='max-height:25mm;'>" 
@@ -479,16 +477,6 @@ class TicketPrintService
         $pdf->Cell(85, 6, utf8_decode('INFORMATIONS CLIENT'), 'B', 1, 'L');
         $pdf->SetX(110);
         $pdf->SetFont('Helvetica', '', 11);
-        if ($order->customer_name) {
-            $pdf->SetX(110);
-            $pdf->Cell(85, 8, utf8_decode(strtoupper($order->customer_name)), 0, 1, 'L');
-            $pdf->SetX(110);
-            $pdf->Cell(85, 5, 'Tel : ' . $order->customer_phone, 0, 1, 'L');
-        } else {
-            $pdf->SetX(110);
-            $pdf->Cell(85, 8, 'CLIENT DE PASSAGE', 0, 1, 'L');
-        }
-        
         $yRight = $pdf->GetY();
         $pdf->SetY(max($yLeft, $yRight));
 
