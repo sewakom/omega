@@ -15,16 +15,34 @@ class SettingsController extends Controller
     {
         abort_unless($request->user()->isManager(), 403);
         $restaurant = $request->user()->restaurant;
-        $data = $request->only(['name', 'address', 'phone', 'email', 'vat_number', 'currency', 'timezone', 'logo']);
-        
+
+        $request->validate([
+            'name' => 'sometimes|string|max:200',
+            'address' => 'nullable|string',
+            'phone' => 'nullable|string|max:30',
+            'email' => 'nullable|email',
+            'vat_number' => 'nullable|string|max:50',
+            'currency' => 'in:XOF,EUR,USD,GHS,NGN',
+            'timezone' => 'nullable|string',
+            'logo' => 'nullable|image|max:2048',
+            'receipt_subtitle' => 'nullable|string|max:200'
+        ]);
+
+        $restaurant->fill($request->only(['name', 'address', 'phone', 'email', 'vat_number', 'currency', 'timezone']));
+
         if ($request->has('receipt_subtitle')) {
             $settings = $restaurant->settings ?? [];
             $settings['receipt_subtitle'] = $request->input('receipt_subtitle');
-            $data['settings'] = $settings;
+            $restaurant->settings = $settings;
         }
 
-        $restaurant->update($data);
-        return response()->json($restaurant);
+        if ($request->hasFile('logo')) {
+            if ($restaurant->logo) Storage::disk('public')->delete($restaurant->logo);
+            $restaurant->logo = $request->file('logo')->store("restaurants/{$restaurant->id}", 'public');
+        }
+
+        $restaurant->save();
+        return response()->json($restaurant->fresh());
     }
 
     public function updateConfig(Request $request)
