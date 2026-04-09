@@ -47,6 +47,8 @@ class ExpenseController extends Controller
             ->latest()
             ->first();
 
+        abort_unless(!!$session, 422, "Aucune session de caisse active. Veuillez d'abord ouvrir la caisse.");
+
         // Créer la dépense
         $expense = Expense::create([
             'restaurant_id'   => $request->user()->restaurant_id,
