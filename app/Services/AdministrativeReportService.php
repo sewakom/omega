@@ -142,6 +142,14 @@ class AdministrativeReportService extends FPDF
         // Direction
         $this->SetFont('Arial', 'B', 16);
         $this->Cell(0, 10, $this->s(strtoupper($this->restaurant->name)), 0, 1, 'C');
+
+        $subtitle = data_get($this->restaurant->settings, 'receipt_subtitle');
+        if ($subtitle) {
+            $this->SetFont('Arial', 'B', 11);
+            $this->SetTextColor(100, 100, 100);
+            $this->Cell(0, 7, $this->s(strtoupper($subtitle)), 0, 1, 'C');
+            $this->SetTextColor(0);
+        }
         
         $this->SetFont('Arial', '', 10);
         if ($this->restaurant->address) $this->Cell(0, 5, $this->s($this->restaurant->address), 0, 1, 'C');
@@ -320,7 +328,7 @@ class AdministrativeReportService extends FPDF
             
             $this->SetFont('Arial', 'B', 11);
             $this->Cell(130, 10, $this->s("TOTAL DÉPENSES"), 1, 0, 'R', true);
-            $this->Cell(60, 10, "- " . number_format($this->data['expenses']->sum('amount'), 0, ',', ' ') . " F", 1, 1, 'R', true);
+            $this->Cell(60, 10, "- " . number_format((float)$this->data['expenses']->sum('amount'), 0, ',', ' ') . " F", 1, 1, 'R', true);
         }
 
         $this->Ln(20);

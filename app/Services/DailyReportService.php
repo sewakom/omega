@@ -9,6 +9,7 @@ use App\Models\Expense;
 use App\Models\Payment;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * DailyReportService
@@ -54,7 +55,7 @@ class DailyReportService
         foreach ($payments as $p) {
             $methodMapping = ['cash' => 'ESPÈCES', 'card' => 'CARTE BANCAIRE', 'wave' => 'WAVE', 'orange_money' => 'ORANGE MONEY', 'momo' => 'MTN MOMO'];
             $method = $methodMapping[$p->method] ?? strtoupper($p->method);
-            $total  = number_format($p->total, 0, ',', ' ');
+            $total  = number_format((float)$p->total, 0, ',', ' ');
             $paymentsHtml .= "<tr>
                 <td style='padding: 10px; border-bottom: 1px solid #eee;'>{$method}</td>
                 <td style='padding: 10px; border-bottom: 1px solid #eee; text-align:center;'>{$p->count}</td>
@@ -119,8 +120,9 @@ class DailyReportService
     <div class='container'>
         <div class='header'>
             <div class='logo-box'>
-                <h1 style='color: #f97316;'>SMARTFLOW <span style='color: #0f172a;'>POS</span></h1>
-                <p style='margin: 5px 0 0; font-size: 12px; font-weight: bold; color: #64748b;'>RAPPORT DE CLÔTURE DE CAISSE</p>
+                <h1 style='color: #f97316;'>" . strtoupper($restaurant->name) . "</h1>
+                " . (data_get($restaurant->settings, 'receipt_subtitle') ? "<p style='margin: 2px 0 0; font-size: 13px; font-weight: bold; color: #64748b;'>" . strtoupper(data_get($restaurant->settings, 'receipt_subtitle')) . "</p>" : "") . "
+                <p style='margin: 5px 0 0; font-size: 11px; font-weight: bold; color: #94a3b8; text-transform: uppercase;'>RAPPORT DE CLÔTURE DE CAISSE</p>
             </div>
             <div class='session-info'>
                 Date: {$session->opened_at->format('d/m/Y')}<br>
@@ -165,8 +167,8 @@ class DailyReportService
         <div class='section-title'>Rapprochement de Caisse</div>
         <div style='background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px dashed #cbd5e1;'>
             <table style='font-size: 14px;'>
-                <tr><td style='padding: 8px 0; color: #64748b;'>Fond d'ouverture :</td><td style='text-align:right; font-weight: bold;'>" . number_format($session->opening_amount, 0, ',', ' ') . " FCFA</td></tr>
-                <tr><td style='padding: 8px 0; color: #64748b;'>Attendu en caisse (Espèces) :</td><td style='text-align:right; font-weight: bold;'>" . number_format($session->expected_amount, 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b;'>Fond d'ouverture :</td><td style='text-align:right; font-weight: bold;'>" . number_format((float)$session->opening_amount, 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b;'>Attendu en caisse (Espèces) :</td><td style='text-align:right; font-weight: bold;'>" . number_format((float)$session->expected_amount, 0, ',', ' ') . " FCFA</td></tr>
                 <tr><td style='padding: 8px 0; color: #64748b;'>Réel compté par le caissier :</td><td style='text-align:right; font-weight: bold; color: #0f172a;'>" . number_format($session->closing_amount ?? 0, 0, ',', ' ') . " FCFA</td></tr>
                 <tr style='border-top: 2px solid #e2e8f0;'><td style='padding: 15px 0 0; font-weight: 900; color: #0f172a; text-transform: uppercase;'>Écart de Caisse :</td><td style='padding: 15px 0 0; text-align:right; font-weight: 900; font-size: 18px; color: {$diffColor};'>" . number_format($session->difference ?? 0, 0, ',', ' ') . " FCFA</td></tr>
             </table>

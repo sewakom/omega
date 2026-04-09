@@ -85,6 +85,9 @@
     <img src="{{ $receipt['restaurant']['logo'] }}" class="logo" alt="" onerror="this.style.display='none'; this.style.opacity='0';">
   @endif
   <div class="bold xlarge">{{ $receipt['restaurant']['name'] }}</div>
+  @if($receipt['restaurant']['receipt_subtitle'] ?? null)
+    <div class="bold" style="font-size:12px; color:#555; margin-bottom: 2px;">{{ $receipt['restaurant']['receipt_subtitle'] }}</div>
+  @endif
   @if($receipt['restaurant']['address'])
     <div class="muted">{{ $receipt['restaurant']['address'] }}</div>
   @endif
