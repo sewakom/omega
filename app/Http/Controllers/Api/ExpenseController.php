@@ -14,7 +14,7 @@ class ExpenseController extends Controller
         $query = Expense::where('restaurant_id', $request->user()->restaurant_id)
             ->with('user:id,first_name,last_name', 'cashSession:id,opened_at')
             ->when($request->cash_session_id, fn($q) => $q->where('cash_session_id', $request->cash_session_id))
-            ->when($request->date, fn($q) => $q->whereDate('created_at', $request->date))
+            ->when($request->date && !$request->cash_session_id, fn($q) => $q->whereDate('created_at', $request->date))
             ->when($request->category, fn($q) => $q->where('category', $request->category))
             ->latest();
 
@@ -188,7 +188,7 @@ class ExpenseController extends Controller
 
                 <div class='amount-container'>
                     <div class='amount-label'>Montant Total Décaissé</div>
-                    <div class='amount-value'>" . number_format($expense->amount, 0, ',', ' ') . " FCFA</div>
+                    <div class='amount-value'>" . number_format((float) $expense->amount, 0, ',', ' ') . " FCFA</div>
                 </div>
 
                 <table class='signature-section' style='margin-top: 80px;'>
