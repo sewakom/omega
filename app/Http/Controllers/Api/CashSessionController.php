@@ -142,11 +142,11 @@ class CashSessionController extends Controller
 
     public function reportPreview(Request $request, CashSession $session)
     {
-        // On autorise la prévisualisation sans auth pour faciliter l'impression
-        $data = $this->reportService->getReportData($session);
+        $pdfContent = $this->reportService->generateSessionPdf($session);
         
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.cash_session', $data);
-        return $pdf->download("Rapport-Session-{$session->id}.pdf");
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="Rapport-Session-' . $session->id . '.pdf"');
     }
 
     /** Historique des sessions */
