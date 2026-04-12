@@ -112,142 +112,128 @@ class DailyReportService
         $pdfUrl = config('app.url') . "/api/cash-sessions/{$session->id}/report-preview";
 
         return "
-<!DOCTYPE html>
-<html lang='fr'>
+<!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Transitional//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd'>
+<html xmlns='http://www.w3.org/1999/xhtml' lang='fr'>
 <head>
-    <meta charset='UTF-8'>
-    <style>
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; background-color: #f1f5f9; }
-        .container { max-width: 850px; margin: 40px auto; background: #ffffff; padding: 50px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 30px; margin-bottom: 40px; }
-        .logo-box h1 { margin: 0; color: #f97316; font-size: 32px; font-weight: 800; letter-spacing: -1px; }
-        .session-info { text-align: right; }
-        .session-badge { display: inline-block; background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 8px; }
-        
-        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
-        .stat-card { padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; }
-        .stat-card.highlight { background: #0f172a; color: #fff; border: none; }
-        .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 8px; }
-        .stat-value { font-size: 24px; font-weight: 800; }
-        
-        .reconciliation-box { background: #f8fafc; padding: 30px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 40px; }
-        .reconciliation-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #475569; margin-bottom: 20px; display: flex; align-items: center; }
-        .reconciliation-title::before { content: ''; display: inline-block; width: 12px; height: 12px; background: #f97316; border-radius: 3px; margin-right: 10px; }
-        
-        .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-        .row.total { border-bottom: none; padding-top: 20px; font-size: 18px; font-weight: 800; color: #0f172a; }
-        .row.sub { padding-left: 20px; color: #64748b; font-size: 13px; }
-        
-        .section-header { font-size: 16px; font-weight: 800; color: #0f172a; margin: 40px 0 20px; display: flex; align-items: center; justify-content: space-between; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px 15px; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-        
-        .footer { margin-top: 60px; text-align: center; border-top: 2px solid #f1f5f9; padding-top: 40px; }
-        .btn-pdf { display: inline-block; background: #0f172a; color: #fff; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; transition: transform 0.2s; }
-    </style>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+    <title>Rapport de Caisse</title>
 </head>
-<body>
-    <div class='container'>
-        <div class='header'>
-            <div class='logo-box'>
-                <h1>" . strtoupper($restaurant->name) . "</h1>
-                <div style='color: #64748b; font-weight: 500; font-size: 14px;'>" . data_get($restaurant->settings, 'receipt_subtitle') . "</div>
-                <div style='margin-top: 15px; font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase;'>Rapport Financier Journalier</div>
-            </div>
-            <div class='session-info'>
-                <div class='session-badge'>SESSION #{$session->id}</div>
-                <div style='font-size: 18px; font-weight: 800; color: #0f172a;'>{$session->opened_at->format('d F Y')}</div>
-                <div style='font-size: 13px; color: #64748b;'>Caissier : <strong>" . strtoupper($session->user->first_name) . "</strong></div>
-            </div>
-        </div>
+<body style='margin: 0; padding: 20px; background-color: #f4f7f9; font-family: Arial, sans-serif; color: #333;'>
+    <table width='100%' border='0' cellspacing='0' cellpadding='0'>
+        <tr>
+            <td align='center'>
+                <table width='600' border='0' cellspacing='0' cellpadding='0' style='background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e1e8ed;'>
+                    <!-- Header -->
+                    <tr>
+                        <td style='padding: 30px; background-color: #f97316; color: #ffffff;'>
+                            <table width='100%' border='0' cellspacing='0' cellpadding='0'>
+                                <tr>
+                                    <td>
+                                        <h1 style='margin: 0; font-size: 24px;'>" . strtoupper($restaurant->name) . "</h1>
+                                        <p style='margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;'>Rapport Financier Journalier</p>
+                                    </td>
+                                    <td align='right' style='font-size: 12px;'>
+                                        <span style='background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 4px;'>SESSION #{$session->id}</span>
+                                        <div style='margin-top: 5px; font-weight: bold;'>{$session->opened_at->format('d/m/Y')}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-        <div class='summary-grid'>
-            <div class='stat-card highlight'>
-                <div class='stat-label'>Recette Totale</div>
-                <div class='stat-value'>" . number_format($totalRevenue, 0, ',', ' ') . " FCFA</div>
-            </div>
-            <div class='stat-card'>
-                <div class='stat-label'>Dépenses</div>
-                <div class='stat-value' style='color: #ef4444;'>-" . number_format($totalExpenses, 0, ',', ' ') . " FCFA</div>
-            </div>
-            <div class='stat-card'>
-                <div class='stat-label'>Crédits Client</div>
-                <div class='stat-value' style='color: #f97316;'>" . number_format($totalCredits, 0, ',', ' ') . " FCFA</div>
-            </div>
-        </div>
+                    <!-- Synthèse rapide -->
+                    <tr>
+                        <td style='padding: 20px;'>
+                            <table width='100%' border='0' cellspacing='10' cellpadding='0'>
+                                <tr>
+                                    <td width='33%' style='background-color: #1e293b; color: #ffffff; padding: 15px; border-radius: 6px; text-align: center;'>
+                                        <div style='font-size: 10px; text-transform: uppercase;'>Recette</div>
+                                        <div style='font-size: 16px; font-weight: bold;'>" . number_format($totalRevenue, 0, ',', ' ') . "</div>
+                                    </td>
+                                    <td width='33%' style='background-color: #f1f5f9; padding: 15px; border-radius: 6px; text-align: center;'>
+                                        <div style='font-size: 10px; text-transform: uppercase;'>Dépenses</div>
+                                        <div style='font-size: 16px; font-weight: bold; color: #ef4444;'>-" . number_format($totalExpenses, 0, ',', ' ') . "</div>
+                                    </td>
+                                    <td width='33%' style='background-color: #f1f5f9; padding: 15px; border-radius: 6px; text-align: center;'>
+                                        <div style='font-size: 10px; text-transform: uppercase;'>Crédits</div>
+                                        <div style='font-size: 16px; font-weight: bold; color: #f97316;'>" . number_format($totalCredits, 0, ',', ' ') . "</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
-        <div class='reconciliation-box'>
-            <div class='reconciliation-title'>Synthèse des Flux de Trésorerie</div>
-            
-            <div class='row'>
-                <span style='font-weight:700'>ARGENT DE L'OUVERTURE (Début)</span>
-                <span><strong>" . number_format((float)$session->opening_amount, 0, ',', ' ') . " FCFA</strong></span>
-            </div>
-            <div class='row'>
-                <span>Encaissé en Espèces (Ventes)</span>
-                <span>+" . number_format((float)($session->expected_amount - $session->opening_amount + $totalExpenses), 0, ',', ' ') . " FCFA</span>
-            </div>
-            <div class='row' style='color: #ef4444;'>
-                <span>Dépenses déduites de la caisse</span>
-                <span>-" . number_format((float)$totalExpenses, 0, ',', ' ') . " FCFA</span>
-            </div>
-            <div class='row' style='background: #fff; padding: 15px; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px;'>
-                <span style='font-weight: 700;'>Montant Attendu en Caisse</span>
-                <span style='font-weight: 800; color: #0f172a;'>" . number_format((float)$session->expected_amount, 0, ',', ' ') . " FCFA</span>
-            </div>
-            
-            <div style='margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1;'>
-                <div class='row sub'>
-                    <span>Montant réellement compté</span>
-                    <span>" . ($session->closing_amount ? number_format((float)$session->closing_amount, 0, ',', ' ') . " FCFA" : "<em>Non clôturé</em>") . "</span>
-                </div>
-                <div class='row sub'>
-                    <span style='color: #f97316; font-weight: 700;'>➤ MONTANT REMIS AU BANQUIER</span>
-                    <span style='color: #f97316; font-weight: 800;'>" . ($session->amount_to_bank ? number_format((float)$session->amount_to_bank, 0, ',', ' ') . " FCFA" : "—") . "</span>
-                </div>
-                <div class='row sub'>
-                    <span>➤ FONDS DE CAISSE RESTANT</span>
-                    <span>" . ($session->remaining_amount ? number_format((float)$session->remaining_amount, 0, ',', ' ') . " FCFA" : "—") . "</span>
-                </div>
-            </div>
+                    <!-- Détail Réconciliation -->
+                    <tr>
+                        <td style='padding: 0 30px 20px 30px;'>
+                            <div style='border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; background-color: #fafbfc;'>
+                                <h3 style='margin: 0 0 15px 0; font-size: 14px; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;'>SYNTHÈSE DE TRÉSORERIE</h3>
+                                <table width='100%' border='0' cellspacing='0' cellpadding='8' style='font-size: 14px;'>
+                                    <tr>
+                                        <td>Ouverture de caisse</td>
+                                        <td align='right'><strong>" . number_format((float)$session->opening_amount, 0, ',', ' ') . " FCFA</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ventes en espèces</td>
+                                        <td align='right'>+" . number_format((float)($session->expected_amount - $session->opening_amount + $totalExpenses), 0, ',', ' ') . " FCFA</td>
+                                    </tr>
+                                    <tr style='color: #ef4444;'>
+                                        <td>Dépenses déduites</td>
+                                        <td align='right'>-" . number_format((float)$totalExpenses, 0, ',', ' ') . " FCFA</td>
+                                    </tr>
+                                    <tr style='background-color: #f1f5f9; font-weight: bold;'>
+                                        <td style='border-top: 1px solid #e2e8f0;'>MONTANT ATTENDU</td>
+                                        <td align='right' style='border-top: 1px solid #e2e8f0; color: #0f172a;'>" . number_format((float)$session->expected_amount, 0, ',', ' ') . " FCFA</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan='2' style='padding-top: 15px; border-top: 1px dashed #cbd5e1;'></td>
+                                    </tr>
+                                    <tr>
+                                        <td style='color: #f97316; font-weight: bold;'>VERSÉ À LA BANQUE</td>
+                                        <td align='right' style='color: #f97316; font-weight: bold;'>" . ($session->amount_to_bank ? number_format((float)$session->amount_to_bank, 0, ',', ' ') : '—') . " FCFA</td>
+                                    </tr>
+                                    <tr>
+                                        <td>FOND DE ROULEMENT RESTANT</td>
+                                        <td align='right'>" . ($session->remaining_amount ? number_format((float)$session->remaining_amount, 0, ',', ' ') : '—') . " FCFA</td>
+                                    </tr>
+                                    <tr style='font-size: 18px; font-weight: bold;'>
+                                        <td style='padding-top: 15px; border-top: 2px solid #0f172a;'>ÉCART FINAL</td>
+                                        <td align='right' style='padding-top: 15px; border-top: 2px solid #0f172a; color: {$diffColor};'>" . number_format((float)($session->difference ?? 0), 0, ',', ' ') . " FCFA</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
 
-            <div class='row total'>
-                <span style='text-transform: uppercase; letter-spacing: 1px;'>ÉCART FINAL</span>
-                <span style='color: {$diffColor}; font-size: 24px;'>" . number_format((float)($session->difference ?? 0), 0, ',', ' ') . " FCFA</span>
-            </div>
-            
-            " . ($session->closing_notes ? "<div style='margin-top:20px; font-size:12px; padding:15px; background:#fff; border-radius:8px; border-left:4px solid #94a3b8; color:#475569;'><strong>Note du caissier :</strong> {$session->closing_notes}</div>" : "") . "
-        </div>
+                    <!-- Logs Activity -->
+                    <tr>
+                        <td style='padding: 0 30px 30px 30px;'>
+                            <h3 style='font-size: 14px; color: #0f172a; margin-bottom: 10px;'>JOURNAL D'ACTIVITÉ (LOGS)</h3>
+                            <table width='100%' border='0' cellspacing='0' cellpadding='5' style='font-size: 11px; border: 1px solid #f1f5f9;'>
+                                <tr style='background-color: #f8fafc; color: #64748b;'>
+                                    <th align='left' style='padding-left: 10px;'>Heure</th>
+                                    <th align='left'>Utilisateur</th>
+                                    <th align='left'>Action</th>
+                                </tr>
+                                {$logsHtml}
+                            </table>
+                        </td>
+                    </tr>
 
-        <div class='section-header'><span>Journal des Événements (Logs)</span></div>
-        <table style='margin-bottom: 30px;'>
-            <thead><tr><th style='width: 60px;'>Heure</th><th style='width: 120px;'>Auteur</th><th>Action effectuée</th></tr></thead>
-            <tbody>{$logsHtml}</tbody>
-        </table>
-
-        <div class='section-header'><span>Détail des Encaissements</span></div>
-        <table>
-            <thead><tr><th>Mode de Paiement</th><th style='text-align:center;'>Nb. Transac</th><th style='text-align:right;'>Montant Total</th></tr></thead>
-            <tbody>{$paymentsHtml}</tbody>
-        </table>
-
-        <div class='section-header'><span>Ventes de cette Session</span></div>
-        <table>
-            <thead><tr><th>Produit / Article</th><th style='text-align:center;'>Qté</th><th style='text-align:right;'>Recette HT</th></tr></thead>
-            <tbody>{$productsHtml}</tbody>
-        </table>
-
-        <div class='footer'>
-            <div style='margin-bottom: 25px;'>
-                <div style='font-size: 14px; color: #64748b; margin-bottom: 20px;'>Ce rapport est généré automatiquement par le système SmartFlow POS.</div>
-                <a href='{$pdfUrl}' class='btn-pdf' target='_blank'>📥 Télécharger le Rapport PDF</a>
-            </div>
-            <div style='font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;'>Généré le " . date('d/m/Y \à H:i') . " — Omega POS Pro</div>
-        </div>
-    </div>
+                    <!-- Footer -->
+                    <tr>
+                        <td style='padding: 20px; background-color: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8;'>
+                            Ce rapport a été généré automatiquement par SmartFlow POS.<br/>
+                            Généré le " . date('d/m/Y à H:i') . "
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>";
+
     }
 
     /**
