@@ -176,12 +176,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('purge-data',      [Api\ExportController::class, 'purge']);
     });
 
-    // Reçus & Tickets
     Route::prefix('receipts')->group(function () {
         Route::get('{orderId}',             [Api\ReceiptController::class, 'show']);
         Route::get('{orderId}/pdf',         [Api\ReceiptController::class, 'pdf']);
         Route::get('{orderId}/html',        [Api\ReceiptController::class, 'html']);
         Route::get('{orderId}/a4',          [Api\ReceiptController::class, 'invoiceA4']);
+        Route::post('bulk-a4',              [Api\ReceiptController::class, 'bulkA4']);
         Route::post('{orderId}/send-email', [Api\ReceiptController::class, 'sendEmail']);
     });
 

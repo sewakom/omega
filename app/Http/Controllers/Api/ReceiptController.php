@@ -141,6 +141,22 @@ class ReceiptController extends Controller
             ->header('Content-Disposition', 'inline; filename="kitchen-' . $destination . '-' . $order->order_number . '.pdf"');
     }
 
+    /** Impression groupée A4 (2 par page) */
+    public function bulkA4(Request $request)
+    {
+        $request->validate(['order_ids' => 'required|array']);
+        $orders = Order::with(['items.product', 'payments', 'table', 'restaurant', 'waiter'])
+            ->where('restaurant_id', $request->user()->restaurant_id)
+            ->whereIn('id', $request->order_ids)
+            ->get();
+
+        $pdfContent = $this->ticketService->generateBulkInvoiceA4Pdf($orders);
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="recus_groupes.pdf"');
+    }
+
     /**
      * Interface polyvalente pour le frontend
      * GET /api/orders/{id}/ticket?type=receipt|invoice

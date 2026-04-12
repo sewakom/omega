@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\CashSession;
 use App\Services\OrderRoutingService;
 use App\Libraries\Fpdf;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 /**
  * TicketPrintService
@@ -1044,5 +1045,20 @@ class TicketPrintService
         $pdf->Cell(0, 5, utf8_decode('Merci pour votre confiance chez ' . $restaurant->name), 0, 1, 'C');
         
         return $pdf->Output('S');
+    }
+
+    /**
+     * Génération groupée A4 (2 par page)
+     */
+    public function generateBulkInvoiceA4Pdf($orders): string
+    {
+        $pdf = Pdf::loadView('receipts.bulk_a4', compact('orders'))
+            ->setPaper('a4', 'portrait')
+            ->setOption('margin-top', 0)
+            ->setOption('margin-bottom', 0)
+            ->setOption('margin-left', 0)
+            ->setOption('margin-right', 0);
+
+        return $pdf->output();
     }
 }
