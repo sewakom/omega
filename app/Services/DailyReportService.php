@@ -239,62 +239,71 @@ class DailyReportService
     /**
      * Envoie le rapport par email au boss (Email de luxe)
      */
+    public function getReportData(CashSession $session): array
+    {
+        $totalRevenue = \App\Models\Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))->sum('total');
+        $totalExpenses = Expense::where('cash_session_id', $session->id)->sum('amount');
+        $restaurant = $session->restaurant;
+        
+        $newCredits = \App\Models\Order::whereHas('customerTabs')
+            ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
+            ->sum('total');
+
+        $payments = \App\Models\Payment::where('cash_session_id', $session->id)
+            ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')
+            ->groupBy('method')
+            ->get();
+
+        $productStats = \Illuminate\Support\Facades\DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('payments.cash_session_id', $session->id)
+            ->select('products.name', \Illuminate\Support\Facades\DB::raw('SUM(order_items.quantity) as total_qty'), \Illuminate\Support\Facades\DB::raw('SUM(order_items.subtotal) as total_amount'))
+            ->groupBy('products.id', 'products.name')
+            ->orderByDesc('total_qty')
+            ->get();
+
+        $logs = \App\Models\ActivityLog::where('restaurant_id', $session->restaurant_id)
+            ->where(function($q) use ($session) {
+                $q->where(function($sq) use ($session) {
+                    $sq->where('subject_type', CashSession::class)
+                       ->where('subject_id', $session->id);
+                })->orWhere(function($sq) use ($session) {
+                    $sq->where('module', 'cash')
+                      ->whereBetween('created_at', [$session->opened_at, $session->closed_at ?? now()]);
+                });
+            })->with('user')->orderBy('created_at', 'asc')->limit(100)->get();
+
+        $pdfUrl = config('app.url') . "/api/cash-sessions/{$session->id}/report-preview";
+
+        return [
+            'session' => $session,
+            'totalRevenue' => $totalRevenue,
+            'totalExpenses' => $totalExpenses,
+            'totalCredits' => $newCredits,
+            'payments' => $payments,
+            'productStats' => $productStats,
+            'logs' => $logs,
+            'restaurant' => $restaurant,
+            'pdfUrl' => $pdfUrl,
+        ];
+    }
+
+    /**
+     * Envoie le rapport de caisse par email
+     *
+     * @param CashSession $session
+     * @param string $toEmail
+     * @return bool
+     */
     public function sendReportByEmail(CashSession $session, string $toEmail): bool
     {
         Log::info("Tentative d'envoi du rapport de caisse à : " . $toEmail);
 
         try {
-            $totalRevenue = \App\Models\Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))->sum('total');
-            $totalExpenses = Expense::where('cash_session_id', $session->id)->sum('amount');
+            $data = $this->getReportData($session);
             $restaurant = $session->restaurant;
-            
-            // Crédits (Ardoises)
-            $newCredits = \App\Models\Order::whereHas('customerTabs')
-                ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
-                ->sum('total');
-
-            // Paiements par méthode
-            $payments = \App\Models\Payment::where('cash_session_id', $session->id)
-                ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')
-                ->groupBy('method')
-                ->get();
-
-            // Produits vendus
-            $productStats = \Illuminate\Support\Facades\DB::table('order_items')
-                ->join('orders', 'order_items.order_id', '=', 'orders.id')
-                ->join('payments', 'payments.order_id', '=', 'orders.id')
-                ->join('products', 'order_items.product_id', '=', 'products.id')
-                ->where('payments.cash_session_id', $session->id)
-                ->select('products.name', \Illuminate\Support\Facades\DB::raw('SUM(order_items.quantity) as total_qty'), \Illuminate\Support\Facades\DB::raw('SUM(order_items.subtotal) as total_amount'))
-                ->groupBy('products.id', 'products.name')
-                ->orderByDesc('total_qty')
-                ->get();
-
-            // Logs
-            $logs = \App\Models\ActivityLog::where('restaurant_id', $session->restaurant_id)
-                ->where(function($q) use ($session) {
-                    $q->where(function($sq) use ($session) {
-                        $sq->where('subject_type', CashSession::class)
-                           ->where('subject_id', $session->id);
-                    })->orWhere(function($sq) use ($session) {
-                        $sq->where('module', 'cash')
-                          ->whereBetween('created_at', [$session->opened_at, $session->closed_at ?? now()]);
-                    });
-                })->with('user')->orderBy('created_at', 'asc')->limit(100)->get();
-
-            $pdfUrl = config('app.url') . "/api/cash-sessions/{$session->id}/report-preview";
-
-            $data = [
-                'session' => $session,
-                'totalRevenue' => $totalRevenue,
-                'totalExpenses' => $totalExpenses,
-                'totalCredits' => $newCredits,
-                'payments' => $payments,
-                'productStats' => $productStats,
-                'logs' => $logs,
-                'restaurant' => $restaurant,
-                'pdfUrl' => $pdfUrl,
-            ];
 
             $subject = "Rapport de Caisse — {$restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
 
