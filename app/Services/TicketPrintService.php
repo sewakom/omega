@@ -270,9 +270,9 @@ class TicketPrintService
             $fmtGiven = number_format($totalGiven, 0, ',', ' ');
             $fmtChange = number_format($totalChange, 0, ',', ' ');
             $givenSummaryHtml = "
-            <table style='width:50%;margin-top:8px;border:2px solid #1a1a2e;border-radius:6px;'>
-              <tr style='background:#f0f0f5'><td style='font-weight:bold;padding:6px'>DONNÉ PAR LE CLIENT</td><td style='text-align:right;font-weight:bold;padding:6px'>{$fmtGiven} FCFA</td></tr>
-              <tr style='background:#f0f0f5'><td style='font-weight:bold;padding:6px'>MONNAIE RENDUE</td><td style='text-align:right;font-weight:bold;padding:6px'>{$fmtChange} FCFA</td></tr>
+            <table style='width:50%;margin-top:8px;border-top:1px dashed #ccc;'>
+              <tr><td style='font-weight:bold;padding:6px;border-bottom:1px solid #eee;'>DONNÉ PAR LE CLIENT</td><td style='text-align:right;font-weight:bold;padding:6px;border-bottom:1px solid #eee;'>{$fmtGiven} FCFA</td></tr>
+              <tr><td style='font-weight:bold;padding:6px;'>MONNAIE RENDUE</td><td style='text-align:right;font-weight:bold;padding:6px;'>{$fmtChange} FCFA</td></tr>
             </table>";
         }
         $waiterName = $order->waiter ? ($order->waiter->first_name . ' ' . $order->waiter->last_name) : null;
@@ -313,16 +313,16 @@ class TicketPrintService
   .invoice-info { text-align: right; }
   .invoice-info h2 { font-size: 18px; color: #16213e; margin-bottom: 6px; }
   .divider { border: none; border-top: 2px solid #1a1a2e; margin: 6px 0; }
-  .customer-block { background: #f5f5f5; padding: 8px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #1a1a2e; }
+  .customer-block { padding: 8px 0; margin-bottom: 10px; border-bottom: 1px dashed #ccc; }
   table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th { background: #1a1a2e; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
+  th { background: transparent; color: #111; padding: 6px 8px; text-align: left; font-size: 10px; font-weight: bold; border-bottom: 2px solid #000; text-transform: uppercase; }
   td { padding: 5px 8px; border-bottom: 1px solid #eee; }
   .totals-table td { border: none; padding: 3px 8px; }
-  .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #1a1a2e; padding-top: 6px; }
+  .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #000; padding-top: 6px; }
   .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 8px; }
-  .table-badge { background: #1a1a2e; color: white; padding: 3px 10px; border-radius: 20px; font-weight: bold; font-size: 12px; }
+  .table-badge { background: #eee; color: #111; padding: 3px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #ccc; }
   .paid-watermark { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 72px; font-weight: 900; color: rgba(0,128,0,0.15); border: 8px solid rgba(0,128,0,0.15); padding: 15px 50px; letter-spacing: 10px; border-radius: 15px; pointer-events: none; z-index: 10; }
-  .serveur-badge { background: #e8e8f0; padding: 4px 10px; border-radius: 4px; font-size: 11px; display: inline-block; margin-bottom: 8px; }
+  .serveur-badge { background: transparent; border: 1px dashed #ccc; padding: 4px 10px; border-radius: 4px; font-size: 11px; display: inline-block; margin-bottom: 8px; }
   @media print { @page { size: A4; margin: 10mm; } }
 </style>
 </head>
@@ -502,14 +502,13 @@ class TicketPrintService
         }
 
         // Table Header
-        $pdf->SetFillColor(26, 26, 46);
-        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(10, 6, '#', 0, 0, 'C', true);
-        $pdf->Cell(100, 6, 'Article / Description', 0, 0, 'L', true);
-        $pdf->Cell(15, 6, 'Qt', 0, 0, 'C', true);
-        $pdf->Cell(25, 6, 'P.U.', 0, 0, 'R', true);
-        $pdf->Cell(30, 6, 'Total', 0, 1, 'R', true);
+        $pdf->Cell(10, 6, '#', 'B', 0, 'C');
+        $pdf->Cell(100, 6, 'Article / Description', 'B', 0, 'L');
+        $pdf->Cell(15, 6, 'Qt', 'B', 0, 'C');
+        $pdf->Cell(25, 6, 'P.U.', 'B', 0, 'R');
+        $pdf->Cell(30, 6, 'Total', 'B', 1, 'R');
 
         // Table Body
         $pdf->SetTextColor(0, 0, 0);
@@ -544,9 +543,8 @@ class TicketPrintService
 
         $pdf->SetX(110);
         $pdf->SetFont('Helvetica', 'B', 10);
-        $pdf->SetFillColor(245, 245, 250);
-        $pdf->Cell(40, 7, utf8_decode('TOTAL À PAYER'), 0, 0, 'L', true);
-        $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 0, 1, 'R', true);
+        $pdf->Cell(40, 7, utf8_decode('TOTAL À PAYER'), 'T,B', 0, 'L');
+        $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
 
         // Left side: Payment Details
         $pdf->SetY($yTotals);
@@ -566,11 +564,10 @@ class TicketPrintService
         if ($totalGiven > 0) {
             $pdf->Ln(2);
             $pdf->SetFont('Helvetica', 'B', 9);
-            $pdf->SetFillColor(240, 240, 240);
-            $pdf->Cell(60, 6, utf8_decode(' DONNÉ PAR LE CLIENT'), 1, 0, 'L', true);
-            $pdf->Cell(35, 6, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
-            $pdf->Cell(60, 6, ' MONNAIE RENDUE', 1, 0, 'L', true);
-            $pdf->Cell(35, 6, number_format($totalChange, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
+            $pdf->Cell(60, 6, utf8_decode(' DONNÉ PAR LE CLIENT'), 'B', 0, 'L');
+            $pdf->Cell(35, 6, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 'B', 1, 'R');
+            $pdf->Cell(60, 6, ' MONNAIE RENDUE', 'B', 0, 'L');
+            $pdf->Cell(35, 6, number_format($totalChange, 0, '.', ' ') . ' FCFA', 'B', 1, 'R');
         }
 
         // Footer
@@ -890,10 +887,9 @@ class TicketPrintService
         $pdf->Ln(5);
         
         // Bloc Client
-        $pdf->SetFillColor(245, 245, 245);
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetTextColor(0);
-        $pdf->Cell(0, 8, utf8_decode('  INFORMATIONS CLIENT'), 0, 1, 'L', true);
+        $pdf->Cell(0, 8, utf8_decode('INFORMATIONS CLIENT'), 'B', 1, 'L');
         $pdf->SetFont('Arial', '', 10);
         $pdf->Cell(95, 7, utf8_decode('Nom: ' . $tab->full_name), 0, 0);
         $pdf->Cell(0, 7, utf8_decode('Téléphone: ' . $tab->phone), 0, 1);
@@ -903,14 +899,13 @@ class TicketPrintService
         
         // Tableau des articles
         $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetFillColor(26, 26, 46);
-        $pdf->SetTextColor(255);
+        $pdf->SetTextColor(0);
         
-        $pdf->Cell(10, 10, '#', 0, 0, 'C', true);
-        $pdf->Cell(85, 10, utf8_decode('Désignation'), 0, 0, 'L', true);
-        $pdf->Cell(15, 10, utf8_decode('Qté'), 0, 0, 'C', true);
-        $pdf->Cell(35, 10, 'P.U. (FCFA)', 0, 0, 'R', true);
-        $pdf->Cell(35, 10, 'Total (FCFA)', 0, 1, 'R', true);
+        $pdf->Cell(10, 10, '#', 'B', 0, 'C');
+        $pdf->Cell(85, 10, utf8_decode('Désignation'), 'B', 0, 'L');
+        $pdf->Cell(15, 10, utf8_decode('Qté'), 'B', 0, 'C');
+        $pdf->Cell(35, 10, 'P.U. (FCFA)', 'B', 0, 'R');
+        $pdf->Cell(35, 10, 'Total (FCFA)', 'B', 1, 'R');
         
         $pdf->SetFont('Arial', '', 9);
         $pdf->SetTextColor(0);
@@ -930,8 +925,8 @@ class TicketPrintService
                 if ($pdf->GetY() > 270) {
                     $pdf->AddPage();
                     $pdf->SetFont('Arial', 'B', 10);
-                    $pdf->Cell(10, 10, '#', 0, 0, 'C', true);
-                    $pdf->Cell(85, 10, 'Suite...', 0, 0, 'L', true);
+                    $pdf->Cell(10, 10, '#', 'B', 0, 'C');
+                    $pdf->Cell(85, 10, 'Suite...', 'B', 0, 'L');
                     $pdf->Ln();
                     $pdf->SetFont('Arial', '', 9);
                 }
@@ -961,10 +956,9 @@ class TicketPrintService
         $pdf->Cell(35, 8, number_format($totalVat, 0, '.', ' '), 0, 1, 'R');
         
         $pdf->SetX(120);
-        $pdf->SetFillColor(26, 26, 46);
-        $pdf->SetTextColor(255);
-        $pdf->Cell(45, 10, 'TOTAL TTC', 0, 0, 'L', true);
-        $pdf->Cell(35, 10, number_format($total, 0, '.', ' ') . ' FCFA', 0, 1, 'R', true);
+        $pdf->SetTextColor(0);
+        $pdf->Cell(45, 10, 'TOTAL TTC', 'T,B', 0, 'L');
+        $pdf->Cell(35, 10, number_format($total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
         
         $pdf->SetX(120);
         $pdf->SetFont('Arial', 'B', 12);
@@ -977,8 +971,7 @@ class TicketPrintService
         
         // Bloc Historique Paiements
         $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetFillColor(240, 240, 240);
-        $pdf->Cell(0, 8, utf8_decode('  HISTORIQUE DES VERSEMENTS'), 0, 1, 'L', true);
+        $pdf->Cell(0, 8, utf8_decode('HISTORIQUE DES VERSEMENTS'), 'B', 1, 'L');
         $pdf->SetFont('Arial', '', 9);
         
         $tab->load('orders.payments');
