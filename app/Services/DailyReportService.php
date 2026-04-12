@@ -125,6 +125,53 @@ class DailyReportService
 
         $pdf->Ln(8);
 
+        // 5.5 Ventes par Catégorie (Cuisine, Bar, Pizza, Gateau...)
+        if ($data['categoryStats']->count() > 0) {
+            $pdf->SetFont('Helvetica', 'B', 11);
+            $pdf->SetFillColor(26, 26, 46);
+            $pdf->SetTextColor(255, 255, 255);
+            $pdf->Cell(0, 8, utf8_decode(" VENTES PAR CATÉGORIE (Cuisine, Bar, Pizza...)"), 0, 1, 'L', true);
+            
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->Cell(100, 6, utf8_decode("Catégorie"), 'B', 0, 'L');
+            $pdf->Cell(30, 6, "Articles", 'B', 0, 'C');
+            $pdf->Cell(50, 6, "Montant", 'B', 1, 'R');
+            
+            $pdf->SetFont('Helvetica', '', 10);
+            foreach ($data['categoryStats'] as $catStat) {
+                if ($pdf->GetY() > 270) $pdf->AddPage();
+                $pdf->Cell(100, 6, utf8_decode(strtoupper($catStat->category_name)), 'B', 0, 'L');
+                $pdf->Cell(30, 6, $catStat->total_qty, 'B', 0, 'C');
+                $pdf->Cell(50, 6, number_format((float)$catStat->total_amount, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
+            }
+            $pdf->Ln(8);
+        }
+
+        // 5.6 Rapport sur les Ardoises (Customer Tabs)
+        if ($data['tabDetails']->count() > 0) {
+            $pdf->SetFont('Helvetica', 'B', 11);
+            $pdf->SetFillColor(234, 88, 12); // Orange for Tabs
+            $pdf->SetTextColor(255, 255, 255);
+            $pdf->Cell(0, 8, utf8_decode(" RAPPORT SUR LES ARDOISES (CREDITS)"), 0, 1, 'L', true);
+            
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->Cell(50, 6, "Commande", 'B', 0, 'L');
+            $pdf->Cell(80, 6, "Client", 'B', 0, 'L');
+            $pdf->Cell(50, 6, "Montant", 'B', 1, 'R');
+            
+            $pdf->SetFont('Helvetica', '', 10);
+            foreach ($data['tabDetails'] as $orderTab) {
+                if ($pdf->GetY() > 270) $pdf->AddPage();
+                $customerNames = $orderTab->customerTabs->map(fn($t) => trim(strtoupper($t->first_name . ' ' . $t->last_name)))->join(', ');
+                $pdf->Cell(50, 6, $orderTab->order_number, 'B', 0, 'L');
+                $pdf->Cell(80, 6, utf8_decode(substr($customerNames, 0, 40)), 'B', 0, 'L');
+                $pdf->Cell(50, 6, number_format((float)$orderTab->total, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
+            }
+            $pdf->Ln(8);
+        }
+
         // 6. Produits Vendus (Top 15)
         $pdf->SetFont('Helvetica', 'B', 11);
         $pdf->SetFillColor(26, 26, 46);
@@ -164,6 +211,11 @@ class DailyReportService
             ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
             ->sum('total');
 
+        $tabDetails = \App\Models\Order::whereHas('customerTabs')
+            ->with(['customerTabs'])
+            ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
+            ->get();
+
         $payments = \App\Models\Payment::where('cash_session_id', $session->id)
             ->selectRaw('method, SUM(amount) as total, COUNT(*) as count')
             ->groupBy('method')
@@ -176,7 +228,18 @@ class DailyReportService
             ->where('payments.cash_session_id', $session->id)
             ->select('products.name', \Illuminate\Support\Facades\DB::raw('SUM(order_items.quantity) as total_qty'), \Illuminate\Support\Facades\DB::raw('SUM(order_items.subtotal) as total_amount'))
             ->groupBy('products.id', 'products.name')
-            ->orderByDesc('total_qty')
+            ->orderByDesc('total_amount')
+            ->get();
+
+        $categoryStats = \Illuminate\Support\Facades\DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('categories', 'products.category_id', '=', 'categories.id')
+            ->where('payments.cash_session_id', $session->id)
+            ->select('categories.name as category_name', \Illuminate\Support\Facades\DB::raw('SUM(order_items.quantity) as total_qty'), \Illuminate\Support\Facades\DB::raw('SUM(order_items.subtotal) as total_amount'))
+            ->groupBy('categories.id', 'categories.name')
+            ->orderByDesc('total_amount')
             ->get();
 
         $logs = \App\Models\ActivityLog::where('restaurant_id', $session->restaurant_id)
@@ -197,8 +260,10 @@ class DailyReportService
             'totalRevenue' => $totalRevenue,
             'totalExpenses' => $totalExpenses,
             'totalCredits' => $newCredits,
+            'tabDetails' => $tabDetails,
             'payments' => $payments,
             'productStats' => $productStats,
+            'categoryStats' => $categoryStats, // Ajout
             'logs' => $logs,
             'restaurant' => $restaurant,
             'pdfUrl' => $pdfUrl,

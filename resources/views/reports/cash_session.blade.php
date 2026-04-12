@@ -99,6 +99,55 @@
             </tbody>
         </table>
 
+        <!-- Ventes par Catégorie -->
+        @if(count($categoryStats) > 0)
+        <h3 style="font-size: 14px; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">VENTES PAR CATÉGORIE (Cuisine, Bar, Pizza...)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px;">
+            <thead>
+                <tr style="background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 11px;">
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0;">Catégorie</th>
+                    <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0;">Articles</th>
+                    <th style="padding: 12px 15px; text-align: right; border-bottom: 2px solid #e2e8f0;">Recette</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($categoryStats as $stat)
+                <tr>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #f1f5f9; font-weight: bold;">{{ strtoupper($stat->category_name) }}</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #f1f5f9; text-align: center;">{{ $stat->total_qty }}</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #f1f5f9; text-align: right;">{{ number_format((float)$stat->total_amount, 0, ',', ' ') }} FCFA</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
+
+        <!-- Rapport Ardoises / Customer Tabs -->
+        @if(count($tabDetails) > 0)
+        <h3 style="font-size: 14px; color: #ea580c; border-bottom: 1px solid #fed7aa; padding-bottom: 8px; margin-bottom: 15px;">RAPPORT SUR LES ARDOISES (CRÉDITS)</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px;">
+            <thead>
+                <tr style="background: #fff7ed; color: #ea580c; text-transform: uppercase; font-size: 11px;">
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #fed7aa;">Commande</th>
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #fed7aa;">Nom du client</th>
+                    <th style="padding: 12px 15px; text-align: right; border-bottom: 2px solid #fed7aa;">Montant (TTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($tabDetails as $orderTab)
+                @php
+                    $customerNames = $orderTab->customerTabs->map(fn($t) => trim(strtoupper($t->first_name . ' ' . $t->last_name)))->join(', ');
+                @endphp
+                <tr>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5;">{{ $orderTab->order_number }}</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5;"><strong>{{ $customerNames ?: 'CLIENT ANONYME' }}</strong></td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5; text-align: right; color: #ea580c; font-weight: bold;">{{ number_format((float)$orderTab->total, 0, ',', ' ') }} FCFA</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
+
         <!-- Produits -->
         <h3 style="font-size: 14px; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">VENTES DE CETTE SESSION</h3>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px;">
