@@ -69,6 +69,12 @@ class DailyReportService
         $pdf->SetXY(10, $currentY + 8);
         $pdf->SetFont('Helvetica', 'B', 14);
         $pdf->Cell(90, 8, number_format((float)$data['totalRevenue'], 0, ',', ' ') . " FCFA", 0, 1, 'C');
+        
+        if ($data['totalVat'] > 0) {
+            $pdf->SetXY(10, $currentY + 14);
+            $pdf->SetFont('Helvetica', 'I', 7);
+            $pdf->Cell(90, 5, utf8_decode("(Dont TVA : " . number_format((float)$data['totalVat'], 0, ',', ' ') . " F)"), 0, 1, 'C');
+        }
 
         $pdf->SetTextColor(71, 85, 105);
         $pdf->SetXY(105, $currentY + 3);
@@ -179,7 +185,12 @@ class DailyReportService
      */
     public function getReportData(CashSession $session): array
     {
-        $totalRevenue = \App\Models\Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))->sum('total');
+        $revenueData = \App\Models\Order::whereHas('payments', fn($q) => $q->where('cash_session_id', $session->id))
+            ->selectRaw('SUM(total) as revenue, SUM(vat_amount) as vat')
+            ->first();
+            
+        $totalRevenue = (float)($revenueData->revenue ?? 0);
+        $totalVat = (float)($revenueData->vat ?? 0);
         $totalExpenses = Expense::where('cash_session_id', $session->id)->sum('amount');
         $restaurant = $session->restaurant;
         
@@ -234,6 +245,7 @@ class DailyReportService
         return [
             'session' => $session,
             'totalRevenue' => $totalRevenue,
+            'totalVat' => $totalVat,
             'totalExpenses' => $totalExpenses,
             'totalCredits' => $newCredits,
             'tabDetails' => $tabDetails,
