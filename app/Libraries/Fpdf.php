@@ -1927,4 +1927,51 @@ protected function _enddoc()
 }
 
 
+
+/**
+ * Rotate content around a center point.
+ * Must call StopRotate() after drawing rotated content.
+ */
+function Rotate($angle, $x=-1, $y=-1)
+{
+	if($x==-1)
+		$x=$this->x;
+	if($y==-1)
+		$y=$this->y;
+	if($angle!=0)
+	{
+		$angle*=M_PI/180;
+		$c=cos($angle);
+		$s=sin($angle);
+		$cx=$x*$this->k;
+		$cy=($this->h-$y)*$this->k;
+		$this->_out(sprintf('q %.5F %.5F %.5F %.5F %.5F %.5F cm',$c,$s,-$s,$c,$cx-$c*$cx+$s*$cy,$cy-$s*$cx-$c*$cy));
+	}
+}
+
+function StopRotate()
+{
+	$this->_out('Q');
+}
+
+/**
+ * Render rotated text at a specific position and angle.
+ */
+function RotatedText($x, $y, $txt, $angle)
+{
+	$this->Rotate($angle, $x, $y);
+	$this->Text($x, $y, $txt);
+	$this->StopRotate();
+}
+
+/**
+ * Draw a rotated rectangle (stamp border effect).
+ */
+function RotatedRect($x, $y, $w, $h, $angle, $style='D')
+{
+	$this->Rotate($angle, $x + $w/2, $y + $h/2);
+	$this->Rect($x, $y, $w, $h, $style);
+	$this->StopRotate();
+}
+
 }
