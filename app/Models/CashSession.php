@@ -17,6 +17,7 @@ class CashSession extends Model
         'cash_total', 'card_total', 'wave_total', 'orange_money_total',
         'momo_total', 'other_total', 'total_expenses',
         'report_sent_at', 'report_email',
+        'amount_to_bank', 'remaining_amount',
     ];
 
     protected $casts = [
@@ -31,6 +32,8 @@ class CashSession extends Model
         'momo_total'          => 'decimal:2',
         'other_total'         => 'decimal:2',
         'total_expenses'      => 'decimal:2',
+        'amount_to_bank'      => 'decimal:2',
+        'remaining_amount'    => 'decimal:2',
         'opened_at'           => 'datetime',
         'closed_at'           => 'datetime',
         'report_sent_at'      => 'datetime',

@@ -78,7 +78,7 @@ class DailyReportService
             $expensesHtml = "<tr><td colspan='3' style='padding: 20px; text-align:center; color: #999; font-style: italic;'>Aucune dépense enregistrée</td></tr>";
         } else {
             foreach ($expenses as $e) {
-                $amt = number_format($e->amount, 0, ',', ' ');
+                $amt = number_format((float)$e->amount, 0, ',', ' ');
                 $expensesHtml .= "<tr>
                     <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->description}</td>
                     <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->category}</td>
@@ -169,8 +169,10 @@ class DailyReportService
             <table style='font-size: 14px;'>
                 <tr><td style='padding: 8px 0; color: #64748b;'>Fond d'ouverture :</td><td style='text-align:right; font-weight: bold;'>" . number_format((float)$session->opening_amount, 0, ',', ' ') . " FCFA</td></tr>
                 <tr><td style='padding: 8px 0; color: #64748b;'>Attendu en caisse (Espèces) :</td><td style='text-align:right; font-weight: bold;'>" . number_format((float)$session->expected_amount, 0, ',', ' ') . " FCFA</td></tr>
-                <tr><td style='padding: 8px 0; color: #64748b;'>Réel compté par le caissier :</td><td style='text-align:right; font-weight: bold; color: #0f172a;'>" . number_format($session->closing_amount ?? 0, 0, ',', ' ') . " FCFA</td></tr>
-                <tr style='border-top: 2px solid #e2e8f0;'><td style='padding: 15px 0 0; font-weight: 900; color: #0f172a; text-transform: uppercase;'>Écart de Caisse :</td><td style='padding: 15px 0 0; text-align:right; font-weight: 900; font-size: 18px; color: {$diffColor};'>" . number_format($session->difference ?? 0, 0, ',', ' ') . " FCFA</td></tr>
+                <tr style='border-top: 1px solid #e2e8f0;'><td style='padding: 8px 0; color: #64748b; font-style: italic;'>Réel compté (Total) :</td><td style='text-align:right; font-weight: bold; color: #0f172a;'>" . number_format((float)($session->closing_amount ?? 0), 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b; padding-left: 20px;'>• Montant remis au banquier :</td><td style='text-align:right; font-weight: bold; color: #f97316;'>" . number_format((float)($session->amount_to_bank ?? 0), 0, ',', ' ') . " FCFA</td></tr>
+                <tr><td style='padding: 8px 0; color: #64748b; padding-left: 20px;'>• Fonds de caisse resté :</td><td style='text-align:right; font-weight: bold; color: #64748b;'>" . number_format((float)($session->remaining_amount ?? 0), 0, ',', ' ') . " FCFA</td></tr>
+                <tr style='border-top: 2px solid #e2e8f0;'><td style='padding: 15px 0 0; font-weight: 900; color: #0f172a; text-transform: uppercase;'>Écart de Caisse :</td><td style='padding: 15px 0 0; text-align:right; font-weight: 900; font-size: 18px; color: {$diffColor};'>" . number_format((float)($session->difference ?? 0), 0, ',', ' ') . " FCFA</td></tr>
             </table>
             " . ($session->closing_notes ? "<div style='margin-top: 20px; font-size: 11px; padding: 10px; background: #fff; border-radius: 6px; color: #64748b;'><strong>Note:</strong> {$session->closing_notes}</div>" : "") . "
         </div>
@@ -208,7 +210,7 @@ class DailyReportService
 
             return true;
         } catch (\Exception $e) {
-            \Log::error('Failed to send cash session report: ' . $e->getMessage());
+            Log::error('Failed to send cash session report: ' . $e->getMessage());
             return false;
         }
     }

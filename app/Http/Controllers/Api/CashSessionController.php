@@ -71,21 +71,26 @@ class CashSessionController extends Controller
         abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Permission requise pour fermer la caisse.');
 
         $request->validate([
-            'closing_amount' => 'required|numeric|min:0',
-            'notes'          => 'nullable|string',
-            'send_report_to' => 'nullable|email',
+            'amount_to_bank'   => 'required|numeric|min:0',
+            'remaining_amount' => 'required|numeric|min:0',
+            'notes'            => 'nullable|string',
+            'send_report_to'   => 'nullable|email',
         ]);
+
+        $closingAmount = (float)$request->amount_to_bank + (float)$request->remaining_amount;
 
         // Calcul des totaux par méthode de paiement
         $totals   = $this->computeTotals($session);
         $cashIn   = $totals['cash'] ?? 0;
         $expected = $session->opening_amount + $cashIn;
-        $diff     = $request->closing_amount - $expected;
+        $diff     = $closingAmount - $expected;
         $expenses = Expense::where('cash_session_id', $session->id)->sum('amount');
 
-        DB::transaction(function () use ($session, $request, $totals, $expected, $diff, $expenses) {
+        DB::transaction(function () use ($session, $request, $totals, $expected, $diff, $expenses, $closingAmount) {
             $session->update([
-                'closing_amount'      => $request->closing_amount,
+                'closing_amount'      => $closingAmount,
+                'amount_to_bank'      => $request->amount_to_bank,
+                'remaining_amount'    => $request->remaining_amount,
                 'expected_amount'     => $expected,
                 'difference'          => $diff,
                 'closing_notes'       => $request->notes,
