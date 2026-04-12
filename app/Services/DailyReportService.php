@@ -57,15 +57,21 @@ class DailyReportService
             ->get();
         $totalCredits = $newCredits->sum('total');
 
-        // 6. Logs d'activité de la session
-        $logs = \App\Models\ActivityLog::where('subject_type', CashSession::class)
-            ->where('subject_id', $session->id)
-            ->orWhere(function($q) use ($session) {
-                $q->where('module', 'cash')
-                  ->whereBetween('created_at', [$session->opened_at, $session->closed_at ?? now()]);
+        // 6. Logs d'activité de la session (uniquement pour ce restaurant)
+        $logs = \App\Models\ActivityLog::where('restaurant_id', $session->restaurant_id)
+            ->where(function($q) use ($session) {
+                $q->where(function($sq) use ($session) {
+                    $sq->where('subject_type', CashSession::class)
+                       ->where('subject_id', $session->id);
+                })
+                ->orWhere(function($sq) use ($session) {
+                    $sq->where('module', 'cash')
+                      ->whereBetween('created_at', [$session->opened_at, $session->closed_at ?? now()]);
+                });
             })
             ->with('user')
             ->orderBy('created_at', 'asc')
+            ->limit(100) // Sécurité : pas plus de 100 logs dans l'e-mail
             ->get();
 
         // Préparation des éléments HTML
@@ -251,12 +257,13 @@ class DailyReportService
     {
         try {
             $html = $this->generateSessionReportHtml($session);
-            $subject = "📊 RAPPORT DE CAISSE — {$session->restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
+            $subject = "RAPPORT DE CAISSE - " . strtoupper($session->restaurant->name) . " - " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
 
-            Mail::html($html, function ($message) use ($toEmail, $subject) {
+            Mail::send([], [], function ($message) use ($toEmail, $subject, $html) {
                 $message->to($toEmail)
                     ->subject($subject)
-                    ->from(config('mail.from.address'), config('mail.from.name'));
+                    ->from(config('mail.from.address'), config('mail.from.name'))
+                    ->html($html);
             });
 
             $session->update([
