@@ -148,14 +148,7 @@ class TicketPrintService
             $method = strtoupper($pmt->method);
             $amt    = number_format($pmt->amount, 0, ',', ' ');
             $paymentsHtml .= "<div class='line'><span>{$method}</span><span>{$amt} FCFA</span></div>";
-            if ($pmt->amount_given) {
-                $given = number_format($pmt->amount_given, 0, ',', ' ');
-                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Donné</span><span>{$given} FCFA</span></div>";
-            }
-            if ($pmt->change_given) {
-                $change = number_format($pmt->change_given, 0, ',', ' ');
-                $paymentsHtml .= "<div class='line' style='font-size:10px;color:#555'><span>&nbsp;&nbsp;Rendu</span><span>{$change} FCFA</span></div>";
-            }
+
         }
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');
