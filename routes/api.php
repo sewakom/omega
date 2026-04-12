@@ -205,6 +205,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{orderId}/html',        [Api\ReceiptController::class, 'html']);
         Route::get('{orderId}/a4',          [Api\ReceiptController::class, 'invoiceA4']);
         Route::post('bulk-a4',              [Api\ReceiptController::class, 'bulkA4']);
+        Route::post('{orderId}/print-network', [Api\ReceiptController::class, 'printNetwork']);
         Route::post('{orderId}/send-email', [Api\ReceiptController::class, 'sendEmail']);
     });
 

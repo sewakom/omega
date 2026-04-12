@@ -181,6 +181,18 @@ class ReceiptController extends Controller
             ->header('Content-Disposition', 'inline; filename="receipt-' . $order->order_number . '.pdf"');
     }
 
+    public function printNetwork(Request $request, int $orderId, \App\Services\EscPosPrintService $escPos)
+    {
+        $order = Order::where('restaurant_id', $request->user()->restaurant_id)->findOrFail($orderId);
+        $result = $escPos->printCustomerReceipt($order);
+
+        if ($result['success']) {
+            return response()->json(['message' => 'Impression lancée avec succès.']);
+        }
+
+        return response()->json(['message' => $result['message']], 500);
+    }
+
     /** Helper pour renvoyer le PDF A4 direct */
     private function invoiceA4PdfDirect(Order $order)
     {

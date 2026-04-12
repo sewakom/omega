@@ -121,6 +121,113 @@ class EscPosPrintService
     }
 
     /**
+     * Imprime le ticket de caisse client complet (TTC + Dont TVA) via IP
+     */
+    public function printCustomerReceipt(Order $order): array
+    {
+        $order->loadMissing(['items.product', 'payments', 'table', 'waiter', 'restaurant', 'cashier']);
+        
+        $settings = $order->restaurant->settings ?? [];
+        $ip = $settings["receipt_printer_ip"] ?? null;
+        $port = $settings['printer_port'] ?? 9100;
+
+        if (!$ip) {
+            return ['success' => false, 'message' => 'Imprimante Reçu non configurée'];
+        }
+
+        try {
+            $connector = new NetworkPrintConnector($ip, $port, 3);
+            $printer = new Printer($connector);
+            
+            // Header
+            $printer->setJustification(Printer::JUSTIFY_CENTER);
+            $printer->setTextSize(1, 1);
+            $printer->text($this->removeAccents(strtoupper($order->restaurant->name)) . "\n");
+            $subtitle = data_get($settings, 'receipt_subtitle');
+            if ($subtitle) {
+                $printer->text($this->removeAccents($subtitle) . "\n");
+            }
+            $printer->text($this->removeAccents($order->restaurant->address) . "\n");
+            if ($order->restaurant->phone) $printer->text("Tel: " . $order->restaurant->phone . "\n");
+            $vNum = $order->restaurant->vat_number;
+            if ($vNum) $printer->text("IFU: " . $vNum . "\n");
+            
+            $printer->text(str_repeat('-', 42) . "\n");
+            
+            $printer->setEmphasis(true);
+            $printer->text("TICKET DE CAISSE #" . $order->order_number . "\n");
+            $printer->setEmphasis(false);
+            $printer->text("Date: " . $order->created_at->format('d/m/Y H:i') . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
+
+            // Items
+            $printer->setJustification(Printer::JUSTIFY_LEFT);
+            foreach ($order->items->whereNotIn('status', ['cancelled']) as $item) {
+                $name = strtoupper($this->removeAccents($item->product->name));
+                $line1 = "X" . $item->quantity . " " . $name;
+                $line2 = number_format($item->subtotal, 0, '.', ' ') . " F";
+                
+                $printer->text($line1 . "\n");
+                $printer->setJustification(Printer::JUSTIFY_RIGHT);
+                $printer->text($line2 . "\n");
+                $printer->setJustification(Printer::JUSTIFY_LEFT);
+            }
+            
+            $printer->text(str_repeat('-', 42) . "\n");
+
+            // Totals
+            $printer->setEmphasis(true);
+            $printer->setTextSize(2, 2); // Grand
+            $printer->setJustification(Printer::JUSTIFY_RIGHT);
+            $printer->text("TOTAL TTC: " . number_format((float)$order->total, 0, '.', ' ') . " F\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+            
+            // Info VAT
+            $vatRate = $settings['default_vat_rate'] ?? 18;
+            $printer->text("Dont TVA (" . $vatRate . "%): " . number_format((float)$order->vat_amount, 0, '.', ' ') . " F\n");
+            
+            if ($order->discount_amount > 0) {
+                $printer->text("Remise: -" . number_format((float)$order->discount_amount, 0, '.', ' ') . " F\n");
+            }
+            
+            $printer->text(str_repeat('-', 42) . "\n");
+
+            // Payments
+            foreach ($order->payments as $p) {
+                $method = match($p->method) { 
+                    'cash' => 'ESPECES', 
+                    'wave' => 'WAVE', 
+                    'momo' => 'MOMO', 
+                    'orange_money' => 'OM', 
+                    default => strtoupper($p->method) 
+                };
+                $printer->text($method . ": " . number_format($p->amount, 0, '.', ' ') . " F\n");
+            }
+            
+            $change = max(0, $order->amountPaid() - $order->total);
+            if ($change > 0) {
+                $printer->text("MONNAIE RENDUE: " . number_format($change, 0, '.', ' ') . " F\n");
+            }
+
+            // Footer
+            $printer->feed(1);
+            $printer->setJustification(Printer::JUSTIFY_CENTER);
+            $printer->text($this->removeAccents($settings['receipt_footer'] ?? 'Merci de votre visite !') . "\n");
+            $printer->text("Powered by Omega POS\n");
+            
+            $printer->feed(3);
+            $printer->cut();
+            $printer->close();
+
+            return ['success' => true];
+        } catch (Exception $e) {
+            Log::error("Failed to print receipt to IP {$ip}: " . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Supprime les accents pour éviter les caractères mal encodés sur l'imprimante thermique
      */
     protected function removeAccents($string)
