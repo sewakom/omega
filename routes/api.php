@@ -15,6 +15,28 @@ Route::get('media/{path}', function ($path) {
     return response()->file(\Illuminate\Support\Facades\Storage::disk('public')->path($path));
 })->where('path', '.*');
 
+Route::get('test-email', function (\Illuminate\Http\Request $request) {
+    $to = $request->query('email', 'sewodakomla@gmail.com');
+    try {
+        \Illuminate\Support\Facades\Mail::raw("Ceci est un test de configuration SMTP pour Smartflow POS. Si vous recevez cet e-mail, la configuration Brevo est fonctionnelle.", function ($message) use ($to) {
+            $message->to($to)
+                ->subject("🧪 TEST SMTP Smartflow POS")
+                ->from(config('mail.from.address'), config('mail.from.name'));
+        });
+        return response()->json([
+            'message' => "E-mail de test envoyé à $to",
+            'from' => config('mail.from.address'),
+            'status' => 'success'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => "Erreur d'envoi : " . $e->getMessage(),
+            'status' => 'error'
+        ], 500);
+    }
+});
+
+
 Route::prefix('auth')->group(function () {
     Route::post('login',     [Api\Auth\AuthController::class, 'login']);
     Route::post('login-pin', [Api\Auth\AuthController::class, 'loginPin']);
