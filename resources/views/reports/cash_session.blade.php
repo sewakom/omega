@@ -21,19 +21,14 @@
         <!-- Chiffres Clés -->
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
             <tr>
-                <td style="width: 33%; background: #1e293b; color: white; padding: 15px; text-align: center; border-radius: 8px;">
+                <td style="width: 49%; background: #1e293b; color: white; padding: 15px; text-align: center; border-radius: 8px;">
                     <div style="font-size: 10px; text-transform: uppercase; margin-bottom: 5px; opacity: 0.8;">Recette Totale</div>
                     <div style="font-size: 20px; font-weight: bold;">{{ number_format((float)$totalRevenue, 0, ',', ' ') }} FCFA</div>
                 </td>
                 <td style="width: 2%;"></td>
-                <td style="width: 31%; background: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px;">
+                <td style="width: 49%; background: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px;">
                     <div style="font-size: 10px; text-transform: uppercase; margin-bottom: 5px; color: #64748b;">Dépenses</div>
                     <div style="font-size: 20px; font-weight: bold; color: #ef4444;">- {{ number_format((float)$totalExpenses, 0, ',', ' ') }} FCFA</div>
-                </td>
-                <td style="width: 2%;"></td>
-                <td style="width: 31%; background: #f1f5f9; padding: 15px; text-align: center; border-radius: 8px;">
-                    <div style="font-size: 10px; text-transform: uppercase; margin-bottom: 5px; color: #64748b;">Crédits Client</div>
-                    <div style="font-size: 20px; font-weight: bold; color: #f97316;">{{ number_format((float)$totalCredits, 0, ',', ' ') }} FCFA</div>
                 </td>
             </tr>
         </table>
@@ -122,50 +117,27 @@
         </table>
         @endif
 
-        <!-- Rapport Ardoises / Customer Tabs -->
-        @if(count($tabDetails) > 0)
-        <h3 style="font-size: 14px; color: #ea580c; border-bottom: 1px solid #fed7aa; padding-bottom: 8px; margin-bottom: 15px;">RAPPORT SUR LES ARDOISES (CRÉDITS)</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px;">
-            <thead>
-                <tr style="background: #fff7ed; color: #ea580c; text-transform: uppercase; font-size: 11px;">
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #fed7aa;">Commande</th>
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #fed7aa;">Nom du client</th>
-                    <th style="padding: 12px 15px; text-align: right; border-bottom: 2px solid #fed7aa;">Montant (TTC)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($tabDetails as $orderTab)
-                @php
-                    $customerNames = $orderTab->customerTabs->map(fn($t) => trim(strtoupper($t->first_name . ' ' . $t->last_name)))->join(', ');
-                @endphp
-                <tr>
-                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5;">{{ $orderTab->order_number }}</td>
-                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5;"><strong>{{ $customerNames ?: 'CLIENT ANONYME' }}</strong></td>
-                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5; text-align: right; color: #ea580c; font-weight: bold;">{{ number_format((float)$orderTab->total, 0, ',', ' ') }} FCFA</td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-        @endif
-
-        <!-- Produits -->
-        <h3 style="font-size: 14px; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">VENTES DE CETTE SESSION</h3>
+        <!-- Ventes par Catégorie et Crédits -->
+        <h3 style="font-size: 14px; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">PERFORMANCES DES SECTEURS ET CRÉDITS</h3>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: 13px;">
             <thead>
                 <tr style="background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 11px;">
-                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0;">Produit / Article</th>
-                    <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0;">Qté</th>
-                    <th style="padding: 12px 15px; text-align: right; border-bottom: 2px solid #e2e8f0;">Recette</th>
+                    <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0;">Secteur / Catégorie</th>
+                    <th style="padding: 12px 15px; text-align: right; border-bottom: 2px solid #e2e8f0;">Recette Générée</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($productStats as $stat)
+                @foreach($categoryStats as $stat)
                 <tr>
-                    <td style="padding: 8px 15px; border-bottom: 1px solid #f9f9f9;">{{ $stat->name }}</td>
-                    <td style="padding: 8px 15px; border-bottom: 1px solid #f9f9f9; text-align: center;">{{ $stat->total_qty }}</td>
-                    <td style="padding: 8px 15px; border-bottom: 1px solid #f9f9f9; text-align: right;">{{ number_format((float)$stat->total_amount, 0, ',', ' ') }} FCFA</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #f1f5f9; font-weight: bold;">VENTES - {{ strtoupper($stat->category_name) }}</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold; color: #10b981;">{{ number_format((float)$stat->total_amount, 0, ',', ' ') }} FCFA</td>
                 </tr>
                 @endforeach
+                <!-- Total Ardoises du jour -->
+                <tr style="background: #fff7ed;">
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5; font-weight: bold; color: #ea580c;">TOTAL DES ARDOISES (CRÉDITS)</td>
+                    <td style="padding: 10px 15px; border-bottom: 1px solid #ffedd5; text-align: right; font-weight: bold; color: #ea580c;">{{ number_format((float)$totalCredits, 0, ',', ' ') }} FCFA</td>
+                </tr>
             </tbody>
         </table>
 

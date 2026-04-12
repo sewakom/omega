@@ -53,16 +53,33 @@ class DailyReportService
         // 3. Totaux Principaux
         $pdf->SetFont('Helvetica', 'B', 12);
         
-        $pdf->SetFillColor(245, 245, 250);
-        $pdf->Cell(60, 15, "RECETTE: " . number_format($data['totalRevenue'], 0, ',', ' '), 0, 0, 'C', true);
+        $currentY = $pdf->GetY();
         
-        $pdf->SetTextColor(220, 38, 38);
-        $pdf->Cell(60, 15, utf8_decode("DEPENSES: -" . number_format($data['totalExpenses'], 0, ',', ' ')), 0, 0, 'C', true);
+        // Rectangles de fond pour Recette, Dépenses
+        $pdf->SetFillColor(30, 41, 59); // Bleu foncé
+        $pdf->Rect(10, $currentY, 90, 20, 'F');
+        $pdf->SetFillColor(241, 245, 249); // Gris clair
+        $pdf->Rect(105, $currentY, 95, 20, 'F');
         
-        $pdf->SetTextColor(234, 88, 12);
-        $pdf->Cell(60, 15, utf8_decode("CREDITS: " . number_format($data['totalCredits'], 0, ',', ' ')), 0, 1, 'C', true);
-        
-        $pdf->Ln(8);
+        // Textes
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetXY(10, $currentY + 3);
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(90, 5, "RECETTE TOTALE", 0, 1, 'C');
+        $pdf->SetXY(10, $currentY + 8);
+        $pdf->SetFont('Helvetica', 'B', 14);
+        $pdf->Cell(90, 8, number_format((float)$data['totalRevenue'], 0, ',', ' ') . " FCFA", 0, 1, 'C');
+
+        $pdf->SetTextColor(71, 85, 105);
+        $pdf->SetXY(105, $currentY + 3);
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(95, 5, utf8_decode("DÉPENSES"), 0, 1, 'C');
+        $pdf->SetTextColor(239, 68, 68); // Rouge
+        $pdf->SetXY(105, $currentY + 8);
+        $pdf->SetFont('Helvetica', 'B', 14);
+        $pdf->Cell(95, 8, "- " . number_format((float)$data['totalExpenses'], 0, ',', ' ') . " FCFA", 0, 1, 'C');
+
+        $pdf->SetXY(15, $currentY + 25);
         $pdf->SetTextColor(0, 0, 0);
 
         // 4. Synthèse Trésorerie
@@ -125,75 +142,34 @@ class DailyReportService
 
         $pdf->Ln(8);
 
-        // 5.5 Ventes par Catégorie (Cuisine, Bar, Pizza, Gateau...)
-        if ($data['categoryStats']->count() > 0) {
-            $pdf->SetFont('Helvetica', 'B', 11);
-            $pdf->SetFillColor(26, 26, 46);
-            $pdf->SetTextColor(255, 255, 255);
-            $pdf->Cell(0, 8, utf8_decode(" VENTES PAR CATÉGORIE (Cuisine, Bar, Pizza...)"), 0, 1, 'L', true);
-            
-            $pdf->SetTextColor(0, 0, 0);
-            $pdf->SetFont('Helvetica', 'B', 9);
-            $pdf->Cell(100, 6, utf8_decode("Catégorie"), 'B', 0, 'L');
-            $pdf->Cell(30, 6, "Articles", 'B', 0, 'C');
-            $pdf->Cell(50, 6, "Montant", 'B', 1, 'R');
-            
-            $pdf->SetFont('Helvetica', '', 10);
-            foreach ($data['categoryStats'] as $catStat) {
-                if ($pdf->GetY() > 270) $pdf->AddPage();
-                $pdf->Cell(100, 6, utf8_decode(strtoupper($catStat->category_name)), 'B', 0, 'L');
-                $pdf->Cell(30, 6, $catStat->total_qty, 'B', 0, 'C');
-                $pdf->Cell(50, 6, number_format((float)$catStat->total_amount, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
-            }
-            $pdf->Ln(8);
-        }
-
-        // 5.6 Rapport sur les Ardoises (Customer Tabs)
-        if ($data['tabDetails']->count() > 0) {
-            $pdf->SetFont('Helvetica', 'B', 11);
-            $pdf->SetFillColor(234, 88, 12); // Orange for Tabs
-            $pdf->SetTextColor(255, 255, 255);
-            $pdf->Cell(0, 8, utf8_decode(" RAPPORT SUR LES ARDOISES (CREDITS)"), 0, 1, 'L', true);
-            
-            $pdf->SetTextColor(0, 0, 0);
-            $pdf->SetFont('Helvetica', 'B', 9);
-            $pdf->Cell(50, 6, "Commande", 'B', 0, 'L');
-            $pdf->Cell(80, 6, "Client", 'B', 0, 'L');
-            $pdf->Cell(50, 6, "Montant", 'B', 1, 'R');
-            
-            $pdf->SetFont('Helvetica', '', 10);
-            foreach ($data['tabDetails'] as $orderTab) {
-                if ($pdf->GetY() > 270) $pdf->AddPage();
-                $customerNames = $orderTab->customerTabs->map(fn($t) => trim(strtoupper($t->first_name . ' ' . $t->last_name)))->join(', ');
-                $pdf->Cell(50, 6, $orderTab->order_number, 'B', 0, 'L');
-                $pdf->Cell(80, 6, utf8_decode(substr($customerNames, 0, 40)), 'B', 0, 'L');
-                $pdf->Cell(50, 6, number_format((float)$orderTab->total, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
-            }
-            $pdf->Ln(8);
-        }
-
-        // 6. Produits Vendus (Top 15)
+        // 5.5 Performances des secteurs (Catégories) et Crédits
         $pdf->SetFont('Helvetica', 'B', 11);
         $pdf->SetFillColor(26, 26, 46);
         $pdf->SetTextColor(255, 255, 255);
-        $pdf->Cell(0, 8, utf8_decode(" VENTES (Produits)"), 0, 1, 'L', true);
+        $pdf->Cell(0, 8, utf8_decode(" PERFORMANCES DES SECTEURS ET CRÉDITS"), 0, 1, 'L', true);
         
         $pdf->SetTextColor(0, 0, 0);
         $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(100, 6, "Article", 'B', 0, 'L');
-        $pdf->Cell(30, 6, "Qte", 'B', 0, 'C');
-        $pdf->Cell(50, 6, "Total", 'B', 1, 'R');
+        $pdf->Cell(130, 6, utf8_decode("Secteur / Catégorie"), 'B', 0, 'L');
+        $pdf->Cell(50, 6, "Recette", 'B', 1, 'R');
         
         $pdf->SetFont('Helvetica', '', 10);
-        foreach ($data['productStats']->take(15) as $stat) {
-            // Empêcher d'écrire en dehors de la page
-            if ($pdf->GetY() > 270) {
-                $pdf->AddPage();
-            }
-            $pdf->Cell(100, 6, utf8_decode(substr($stat->name, 0, 50)), 'B', 0, 'L');
-            $pdf->Cell(30, 6, $stat->total_qty, 'B', 0, 'C');
-            $pdf->Cell(50, 6, number_format((float)$stat->total_amount, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
+        foreach ($data['categoryStats'] as $catStat) {
+            if ($pdf->GetY() > 270) $pdf->AddPage();
+            $pdf->Cell(130, 6, utf8_decode("VENTES - " . strtoupper($catStat->category_name)), 'B', 0, 'L');
+            $pdf->SetTextColor(16, 185, 129); // Green text
+            $pdf->Cell(50, 6, number_format((float)$catStat->total_amount, 0, ',', ' ') . " FCFA", 'B', 1, 'R');
+            $pdf->SetTextColor(0, 0, 0); // Reset
         }
+        
+        if ($pdf->GetY() > 270) $pdf->AddPage();
+        $pdf->SetTextColor(234, 88, 12); // Orange text
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(130, 6, utf8_decode("TOTAL DES ARDOISES (CRÉDITS)"), 'B', 0, 'L');
+        $pdf->Cell(50, 6, number_format((float)$data['totalCredits'], 0, ',', ' ') . " FCFA", 'B', 1, 'R');
+        $pdf->SetTextColor(0, 0, 0); // Reset
+        
+        $pdf->Ln(8);
 
         return $pdf->Output('S');
     }

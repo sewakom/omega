@@ -130,13 +130,32 @@ class CashSessionController extends Controller
         abort_if($session->restaurant_id !== $request->user()->restaurant_id, 403);
         abort_unless($request->user()->hasRole(['admin', 'manager', 'cashier']), 403, 'Permission requise.');
 
-        $request->validate(['email' => 'required|email']);
+        $request->validate([
+            'email' => 'required|email',
+            'amount_to_bank' => 'nullable|numeric',
+            'remaining_amount' => 'nullable|numeric'
+        ]);
+
+        // Mise à jour de la session avec les montants saisis avant envoi du rapport
+        if ($request->has('amount_to_bank') || $request->has('remaining_amount')) {
+            $session->update([
+                'amount_to_bank' => $request->amount_to_bank ?? $session->amount_to_bank,
+                'remaining_amount' => $request->remaining_amount ?? $session->remaining_amount,
+            ]);
+            
+            // Recalculer la différence (écart) s'il y a lieu
+            if ($session->expected_amount > 0) {
+                $totalCounted = (float)$session->amount_to_bank + (float)$session->remaining_amount;
+                $session->update(['difference' => $totalCounted - $session->expected_amount]);
+            }
+        }
 
         $sent = $this->reportService->sendReportByEmail($session, $request->email);
 
         return response()->json([
             'message'  => $sent ? 'Rapport envoyé avec succès.' : 'Échec de l\'envoi (vérifiez votre configuration SMTP).',
             'sent'     => $sent,
+            'session'  => $session->fresh()
         ]);
     }
 
