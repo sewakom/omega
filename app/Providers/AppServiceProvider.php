@@ -12,6 +12,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->environment('production') || env('APP_ENV') === 'production') {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Policies
         Gate::policy(\App\Models\Order::class, \App\Policies\OrderPolicy::class);
         Gate::policy(\App\Models\User::class, \App\Policies\UserPolicy::class);
