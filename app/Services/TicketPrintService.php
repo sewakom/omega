@@ -172,6 +172,11 @@ class TicketPrintService
         };
         $tableLabel  = $order->table ? "Table {$order->table->number}" : $typeLabel;
         $subtotal    = number_format((float) ($order->subtotal ?? 0), 0, ',', ' ');
+        $discountRow = '';
+        if ($order->discount_amount > 0) {
+            $disc = number_format((float) $order->discount_amount, 0, ',', ' ');
+            $discountRow = "<div class='line'><span>Remise</span><span>-{$disc} FCFA</span></div>";
+        }
         $vatRate     = $restaurant->settings['default_vat_rate'] ?? 18;
         $vat         = number_format((float) ($order->vat_amount ?? 0), 0, ',', ' ');
         $total       = number_format((float) ($order->total ?? 0), 0, ',', ' ');
@@ -219,11 +224,12 @@ class TicketPrintService
   " . ($serveur ? "<div class='line'><span>Serveur</span><span>{$serveur}</span></div>" : "") . "
   <div class='divider'></div>
   {$itemsHtml}
-  <div class='divider'></div>
-  <div class='line'><span>Sous-total</span><span>{$subtotal} FCFA</span></div>
-  <div class='line'><span>TVA ({$vatRate}%)</span><span>{$vat} FCFA</span></div>
-  <div class='divider'></div>
-  <div class='line total-line'><span>TOTAL</span><span>{$total} FCFA</span></div>
+  <div class='totals'>
+    <div class='line'><span>Sous-total</span><span>{$subtotal} FCFA</span></div>
+    {$discountRow}
+    <div class='line total-line'><span>TOTAL TTC</span><span>{$total} FCFA</span></div>
+    <div class='line'><small>Dont TVA ({$vatRate}%)</small><small>{$vat} FCFA</small></div>
+  </div>
   <div class='divider'></div>
   {$givenChangeHtml}
   " . ($order->paid_at ? "<div class='paid-stamp'>PAYÉ</div>" : "") . "
@@ -365,8 +371,8 @@ class TicketPrintService
   <table class='totals-table' style='width:45%; margin-left:55%; margin-top:20px;'>
     <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
     {$discountRow}
-    <tr><td>TVA ({$vatRate}%)</td><td style='text-align:right'>{$vat} FCFA</td></tr>
-    <tr class='total-row'><td>TOTAL À PAYER</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
   </table>
   <div style='margin-top:10px;'>
     <h3 style='border-bottom:1px solid #eee; padding-bottom:3px; font-size:11px; margin-bottom:6px;'>DÉTAILS PAIEMENT</h3>
@@ -538,13 +544,14 @@ class TicketPrintService
         $pdf->Cell(30, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         
         $pdf->SetX(110);
-        $pdf->Cell(40, 5, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
-        $pdf->Cell(30, 5, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->Cell(40, 7, utf8_decode('TOTAL TTC'), 'T,B', 0, 'L');
+        $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
 
         $pdf->SetX(110);
-        $pdf->SetFont('Helvetica', 'B', 10);
-        $pdf->Cell(40, 7, utf8_decode('TOTAL À PAYER'), 'T,B', 0, 'L');
-        $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
+        $pdf->SetFont('Helvetica', '', 8);
+        $pdf->Cell(40, 5, 'Dont TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
+        $pdf->Cell(30, 5, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         $yRight = $pdf->GetY();
 
         // Left side: Payment Details
@@ -801,12 +808,12 @@ class TicketPrintService
             $pdf->Cell(25, 4, '-' . number_format((float) $order->discount_amount, 0, '.', ' '), 0, 1, 'R');
         }
 
-        $pdf->Cell(45, 4, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0);
-        $pdf->Cell(25, 4, number_format((float) $order->vat_amount, 0, '.', ' '), 0, 1, 'R');
-
         $pdf->SetFont('Arial', 'B', 10);
-        $pdf->Cell(45, 6, 'TOTAL', 0, 0);
+        $pdf->Cell(45, 6, 'TOTAL TTC', 0, 0);
         $pdf->Cell(25, 6, number_format((float) $order->total, 0, '.', ' '), 0, 1, 'R');
+        $pdf->SetFont('Arial', '', 7);
+        $pdf->Cell(45, 4, 'Dont TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)');
+        $pdf->Cell(25, 4, number_format((float) $order->vat_amount, 0, '.', ' '), 0, 1, 'R');
         $pdf->SetFont('Arial', '', 8);
 
         $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
@@ -951,18 +958,14 @@ class TicketPrintService
         $paid = $tab->paid_amount;
         $remaining = $tab->remainingAmount();
         $vatRate = $restaurant->settings['default_vat_rate'] ?? 18;
-        
-        $pdf->Cell(45, 8, 'Total HT', 0, 0);
-        $pdf->Cell(35, 8, number_format($total - $totalVat, 0, '.', ' '), 0, 1, 'R');
-        
-        $pdf->SetX(120);
-        $pdf->Cell(45, 8, utf8_decode('TVA (' . $vatRate . '%)'), 0, 0);
-        $pdf->Cell(35, 8, number_format((float) $totalVat, 0, '.', ' '), 0, 1, 'R');
-        
         $pdf->SetX(120);
         $pdf->SetTextColor(0);
         $pdf->Cell(45, 10, 'TOTAL TTC', 'T,B', 0, 'L');
-        $pdf->Cell(35, 10, number_format($total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
+        $pdf->Cell(35, 10, number_format((float) $total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
+        $pdf->SetFont('Arial', '', 9);
+        $pdf->SetX(120);
+        $pdf->Cell(45, 8, utf8_decode('Dont TVA (' . $vatRate . '%)'), 0, 0);
+        $pdf->Cell(35, 8, number_format((float) $totalVat, 0, '.', ' '), 0, 1, 'R');
         
         $pdf->SetX(120);
         $pdf->SetFont('Arial', 'B', 12);

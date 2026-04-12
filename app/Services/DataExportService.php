@@ -59,7 +59,7 @@ class DataExportService
             $cb(['Période', $from->format('d/m/Y') . ' au ' . $to->format('d/m/Y')]);
             $cb(['Nombre de commandes validées', $stats->count ?? 0]);
             $cb(['Chiffre d\'Affaires TOTAL (TTC)', $stats->total ?? 0]);
-            $cb(['Total TVA collectée', $stats->vat ?? 0]);
+            $cb(['Dont TVA (incluse dans le TTC)', $stats->vat ?? 0]);
             $cb(['Total Remises accordées', $stats->discount ?? 0]);
             
             $cb(['', '']);

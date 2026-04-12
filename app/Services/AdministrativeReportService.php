@@ -253,11 +253,11 @@ class AdministrativeReportService extends FPDF
             $this->Cell(70, 10, number_format($amount, 0, ',', ' ') . " F", 1, 1, 'R');
         }
 
-        // Différence due à la TVA, aux remises ou aux frais de livraison
+        // Différence due aux remises ou aux frais de livraison
         $annexes = $this->data['restaurant_ca'] - $sumOfSections;
         if (round($annexes, 2) != 0) {
             $this->SetFont('Arial', 'I', 10);
-            $this->Cell(120, 10, $this->s("TVA, Remises et Frais Annexes"), 1, 0, 'L');
+            $this->Cell(120, 10, $this->s("Remises et Ajustements"), 1, 0, 'L');
             $this->Cell(70, 10, number_format($annexes, 0, ',', ' ') . " F", 1, 1, 'R');
             $this->SetFont('Arial', '', 11);
         }

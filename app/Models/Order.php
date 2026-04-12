@@ -50,7 +50,7 @@ class Order extends Model
     public function scopeToday($q)  { return $q->whereDate('created_at', today()); }
     public function scopePaid($q)   { return $q->where('status', 'paid'); }
 
-    // Calculer et mettre à jour les totaux
+    // Calculer et mettre à jour les totaux (Mode TTC)
     public function recalculate(): void
     {
         $subtotal = $this->items()
@@ -59,15 +59,21 @@ class Order extends Model
 
         $vatRate = $this->vat_rate ?: ($this->restaurant->settings['default_vat_rate'] ?? 18);
         
-        // Formule TVA appliquée (HT -> TTC) : TVA = HT * taux/100
-        $subAfterDisc = (float) $subtotal - (float) $this->discount_amount;
-        $vatAmount    = (float) round($subAfterDisc * ($vatRate / 100), 2);
+        // Mode TTC : Les prix incluent la TVA. 
+        // Total = Sous-total - Remise
+        $total = max(0, (float) $subtotal - (float) $this->discount_amount);
+        
+        // Extraction de la TVA du Total
+        $vatAmount = 0;
+        if ($vatRate > 0) {
+            $vatAmount = (float) round($total - ($total / (1 + ($vatRate / 100))), 2);
+        }
         
         $this->update([
-            'subtotal'   => $subtotal,
+            'subtotal'   => $subtotal, // Subtotal est TTC
             'vat_rate'   => $vatRate,
             'vat_amount' => $vatAmount,
-            'total'      => max(0, $subAfterDisc + $vatAmount),
+            'total'      => $total, // Total à payer est exactement le TTC
         ]);
     }
 
