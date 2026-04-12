@@ -51,13 +51,24 @@ class DailyReportService
         $expenses = Expense::where('cash_session_id', $session->id)->get();
         $totalExpenses = $expenses->sum('amount');
         
-        // 5. Nouveaux Crédits (Ardoises) - Commandes passées en ardoise durant cette session
+        // 5. Nouveaux Crédits (Ardoises)
         $newCredits = Order::whereHas('customerTabs')
             ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
             ->get();
         $totalCredits = $newCredits->sum('total');
 
-        // 5. Préparation des éléments HTML
+        // 6. Logs d'activité de la session
+        $logs = \App\Models\ActivityLog::where('subject_type', CashSession::class)
+            ->where('subject_id', $session->id)
+            ->orWhere(function($q) use ($session) {
+                $q->where('module', 'cash')
+                  ->whereBetween('created_at', [$session->opened_at, $session->closed_at ?? now()]);
+            })
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        // Préparation des éléments HTML
         $paymentsHtml = '';
         foreach ($payments as $p) {
             $methodMapping = ['cash' => 'ESPÈCES', 'card' => 'CARTE BANCAIRE', 'wave' => 'WAVE', 'orange_money' => 'ORANGE MONEY', 'momo' => 'MTN MOMO'];
@@ -80,10 +91,18 @@ class DailyReportService
             </tr>";
         }
 
-        $netEncaisse = $totalRevenue - $totalExpenses;
-        $diffColor = ($session->difference ?? 0) >= 0 ? '#10b981' : '#ef4444';
+        $logsHtml = '';
+        foreach ($logs as $log) {
+            $time = $log->created_at->format('H:i');
+            $user = $log->user ? strtoupper($log->user->first_name) : 'SYSTEM';
+            $logsHtml .= "<tr>
+                <td style='padding: 6px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; color: #64748b;'>{$time}</td>
+                <td style='padding: 6px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; color: #0f172a; font-weight: 700;'>{$user}</td>
+                <td style='padding: 6px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; color: #475569;'>{$log->description}</td>
+            </tr>";
+        }
 
-        // URL pour le PDF (via API car la route est protégée)
+        $diffColor = ($session->difference ?? 0) >= 0 ? '#10b981' : '#ef4444';
         $pdfUrl = config('app.url') . "/api/cash-sessions/{$session->id}/report-preview";
 
         return "
@@ -175,15 +194,15 @@ class DailyReportService
             <div style='margin-top: 30px; padding-top: 20px; border-top: 2px dashed #cbd5e1;'>
                 <div class='row sub'>
                     <span>Montant réellement compté</span>
-                    <span>" . number_format((float)($session->closing_amount ?? 0), 0, ',', ' ') . " FCFA</span>
+                    <span>" . ($session->closing_amount ? number_format((float)$session->closing_amount, 0, ',', ' ') . " FCFA" : "<em>Non clôturé</em>") . "</span>
                 </div>
                 <div class='row sub'>
                     <span style='color: #f97316; font-weight: 700;'>➤ MONTANT REMIS AU BANQUIER</span>
-                    <span style='color: #f97316; font-weight: 800;'>" . number_format((float)($session->amount_to_bank ?? 0), 0, ',', ' ') . " FCFA</span>
+                    <span style='color: #f97316; font-weight: 800;'>" . ($session->amount_to_bank ? number_format((float)$session->amount_to_bank, 0, ',', ' ') . " FCFA" : "—") . "</span>
                 </div>
                 <div class='row sub'>
                     <span>➤ FONDS DE CAISSE RESTANT</span>
-                    <span>" . number_format((float)($session->remaining_amount ?? 0), 0, ',', ' ') . " FCFA</span>
+                    <span>" . ($session->remaining_amount ? number_format((float)$session->remaining_amount, 0, ',', ' ') . " FCFA" : "—") . "</span>
                 </div>
             </div>
 
@@ -195,17 +214,19 @@ class DailyReportService
             " . ($session->closing_notes ? "<div style='margin-top:20px; font-size:12px; padding:15px; background:#fff; border-radius:8px; border-left:4px solid #94a3b8; color:#475569;'><strong>Note du caissier :</strong> {$session->closing_notes}</div>" : "") . "
         </div>
 
-        <div class='section-header'>
-            <span>Détail des Encaissements</span>
-        </div>
+        <div class='section-header'><span>Journal des Événements (Logs)</span></div>
+        <table style='margin-bottom: 30px;'>
+            <thead><tr><th style='width: 60px;'>Heure</th><th style='width: 120px;'>Auteur</th><th>Action effectuée</th></tr></thead>
+            <tbody>{$logsHtml}</tbody>
+        </table>
+
+        <div class='section-header'><span>Détail des Encaissements</span></div>
         <table>
             <thead><tr><th>Mode de Paiement</th><th style='text-align:center;'>Nb. Transac</th><th style='text-align:right;'>Montant Total</th></tr></thead>
             <tbody>{$paymentsHtml}</tbody>
         </table>
 
-        <div class='section-header'>
-            <span>Ventes de cette Session</span>
-        </div>
+        <div class='section-header'><span>Ventes de cette Session</span></div>
         <table>
             <thead><tr><th>Produit / Article</th><th style='text-align:center;'>Qté</th><th style='text-align:right;'>Recette HT</th></tr></thead>
             <tbody>{$productsHtml}</tbody>
@@ -228,12 +249,6 @@ class DailyReportService
      */
     public function sendReportByEmail(CashSession $session, string $toEmail): bool
     {
-        // Sécurité : Ne pas envoyer si les montants de clôture sont absents
-        if (is_null($session->amount_to_bank) || is_null($session->remaining_amount)) {
-            Log::warning("Échec d'envoi du rapport : Montants manquants pour la session #{$session->id}");
-            return false;
-        }
-
         try {
             $html = $this->generateSessionReportHtml($session);
             $subject = "📊 RAPPORT DE CAISSE — {$session->restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
@@ -255,4 +270,5 @@ class DailyReportService
             return false;
         }
     }
+
 }
