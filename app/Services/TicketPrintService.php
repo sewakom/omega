@@ -273,14 +273,6 @@ class TicketPrintService
             $method = strtoupper($pmt->method);
             $amt    = number_format($pmt->amount, 0, ',', ' ');
             $paymentsHtml .= "<tr><td>{$method}</td><td style='text-align:right'>{$amt} FCFA</td></tr>";
-            if ($pmt->amount_given) {
-                $given = number_format($pmt->amount_given, 0, ',', ' ');
-                $paymentsHtml .= "<tr><td style='padding-left:15px;color:#666;font-size:10px'>Donné par le client</td><td style='text-align:right;color:#666;font-size:10px'>{$given} FCFA</td></tr>";
-            }
-            if ($pmt->change_given) {
-                $change = number_format($pmt->change_given, 0, ',', ' ');
-                $paymentsHtml .= "<tr><td style='padding-left:15px;color:#666;font-size:10px'>Monnaie rendue</td><td style='text-align:right;color:#666;font-size:10px'>{$change} FCFA</td></tr>";
-            }
         }
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');
@@ -577,12 +569,6 @@ class TicketPrintService
         foreach ($order->payments as $pmt) {
             $pdf->Cell(50, 4, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
             $pdf->Cell(40, 4, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-            if ($pmt->amount_given) {
-                $pdf->SetTextColor(120);
-                $pdf->Cell(50, 4, utf8_decode('  Donné par le client'), 0, 0, 'L');
-                $pdf->Cell(40, 4, number_format($pmt->amount_given, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-                $pdf->SetTextColor(0);
-            }
         }
         
         // Big Summary Box
