@@ -220,6 +220,7 @@ class TicketPrintService
     " . (data_get($restaurant->settings, 'receipt_subtitle') ? "<div style='font-size:10px; font-weight:bold; margin-bottom:2px; color:#555;'>" . data_get($restaurant->settings, 'receipt_subtitle') . "</div>" : "") . "
     " . ($restoAddress ? "<div style='font-size:9px'>{$restoAddress}</div>" : "") . "
     " . ($restaurant->phone ? "<div style='font-size:9px'>Tél: {$restaurant->phone}</div>" : "") . "
+    <div style='font-size:10px; font-weight:bold; margin-top:2px;'>IFU : 1001580865</div>
     <div style='font-size:9px'>{$date}</div>
   </div>
   <div class='table-box'>{$tableLabel}</div>
@@ -353,6 +354,7 @@ class TicketPrintService
       " . ($restoAddr ? "<div>{$restoAddr}</div>" : "") . "
       " . ($restoPhone ? "<div>Tél: {$restoPhone}</div>" : "") . "
       " . ($restaurant->email ? "<div>{$restaurant->email}</div>" : "") . "
+      <div style='font-size:14px; font-weight:bold; margin-top:5px; color:#000;'>IFU : 1001580865</div>
     </div>
     <div class='invoice-info'>
       <h2>FACTURE</h2>
@@ -486,17 +488,17 @@ class TicketPrintService
         $pdf->Cell(80, 4, 'Date : ' . $order->created_at->format('d/m/Y H:i'), 0, 1, 'R');
 
         if ($restaurant->vat_number) {
-            $pdf->Cell(100, 4, 'TVA : ' . $restaurant->vat_number, 0, 1, 'L');
+            $pdf->Cell(60, 4, 'TVA : ' . $restaurant->vat_number, 0, 0, 'L');
         }
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->Cell(120, 4, 'IFU : 1001580865', 0, 1, 'R');
 
         $pdf->Ln(3);
 
-        // Info Commande & Client
+        // Info Commande
         $yBefore = $pdf->GetY();
         $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(95, 5, utf8_decode('DÉTAILS COMMANDE'), 'B', 0, 'L');
-        $pdf->SetX(110);
-        $pdf->Cell(85, 5, utf8_decode('INFORMATIONS CLIENT'), 'B', 1, 'L');
+        $pdf->Cell(0, 5, utf8_decode('DÉTAILS COMMANDE'), 'B', 1, 'L');
 
         $pdf->SetFont('Helvetica', '', 8);
         $typeLabel = match($order->type) {
@@ -510,10 +512,6 @@ class TicketPrintService
         if ($order->table) {
             $pdf->Cell(45, 4, 'Table: ' . $order->table->number, 0, 0);
         }
-        $customer = $order->customer_name ?? 'Client de passage';
-        $pdf->SetX(110);
-        $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(85, 4, utf8_decode($customer), 0, 1);
         
         $pdf->SetFont('Helvetica', '', 8);
         if ($order->waiter) {
@@ -640,9 +638,12 @@ class TicketPrintService
         $pdf->Cell(0, 5, utf8_decode(strtoupper($order->restaurant->name)), 0, 1, 'C');
         $subtitle = data_get($order->restaurant->settings, 'receipt_subtitle');
         if ($subtitle) {
-            $pdf->SetFont('Helvetica', 'BI', 8);
+            $pdf->SetFont('Helvetica', 'BI', 7);
             $pdf->Cell(0, 4, utf8_decode($subtitle), 0, 1, 'C');
         }
+        
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->Cell(0, 5, 'IFU : 1001580865', 0, 1, 'C');
         $pdf->Ln(2);
 
         // Entête Destination
