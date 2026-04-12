@@ -445,6 +445,28 @@ class TicketPrintService
         
         $pdf->SetY($yStart);
 
+        // Paid Stamp en ARRIÈRE-PLAN (Style filigrane)
+        if ($order->paid_at) {
+            $stampCX = 105; // Centre horizontal
+            $stampCY = $yStart + 75; // Centre vertical approximatif du reçu
+            $stampW  = 70;
+            $stampH  = 22;
+            $stampAngle = -30;
+
+            $pdf->SetDrawColor(210, 235, 210); // Encore plus clair pour l'arrière-plan
+            $pdf->SetLineWidth(1.2);
+            $pdf->RotatedRect($stampCX - $stampW/2, $stampCY - $stampH/2, $stampW, $stampH, $stampAngle);
+            $pdf->SetLineWidth(0.2);
+
+            $pdf->SetFont('Helvetica', 'B', 36);
+            $pdf->SetTextColor(210, 235, 210);
+            $pdf->RotatedText($stampCX - 22, $stampCY + 5, utf8_decode('PAYÉ'), $stampAngle);
+
+            // Restaurer couleurs pour le texte qui arrive par dessus
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetDrawColor(0, 0, 0);
+        }
+
         // Header - Reduced size to fit all
         $pdf->SetFont('Helvetica', 'B', 16);
         $pdf->SetTextColor(26, 26, 46);
@@ -588,30 +610,6 @@ class TicketPrintService
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Cell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance') . ' - Powered by Omega POS', 0, 1, 'C');
 
-        // Paid Stamp (Tampon penché avec bordure, style filigrane comme l'A4 HTML)
-        if ($order->paid_at) {
-            // Position du tampon au centre du bloc reçu
-            $stampCX = 105; // Centre horizontal de la page A4
-            $stampCY = $yStart + 70; // Centre vertical du bloc reçu
-            $stampW  = 70;
-            $stampH  = 22;
-            $stampAngle = -30;
-
-            // Bordure du tampon (rectangle penché, vert très clair)
-            $pdf->SetDrawColor(180, 220, 180);
-            $pdf->SetLineWidth(1.2);
-            $pdf->RotatedRect($stampCX - $stampW/2, $stampCY - $stampH/2, $stampW, $stampH, $stampAngle);
-            $pdf->SetLineWidth(0.2); // Restore default
-
-            // Texte PAYÉ penché, vert très clair
-            $pdf->SetFont('Helvetica', 'B', 36);
-            $pdf->SetTextColor(180, 220, 180);
-            $pdf->RotatedText($stampCX - 22, $stampCY + 5, utf8_decode('PAYÉ'), $stampAngle);
-
-            // Restaurer
-            $pdf->SetTextColor(0, 0, 0);
-            $pdf->SetDrawColor(0, 0, 0);
-        }
     }
     /**
      * Ticket Cuisine/Bar/Pizza en format PDF 58/80mm SANS PRIX
