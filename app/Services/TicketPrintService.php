@@ -456,31 +456,31 @@ class TicketPrintService
         
         $pdf->SetY($yStart);
 
-        // Header
-        $pdf->SetFont('Helvetica', 'B', 18);
-        $pdf->SetTextColor(26, 26, 46);
-        $pdf->Cell(100, 10, utf8_decode(strtoupper($restaurant->name)), 0, 0);
-        
+        // Header - Reduced size to fit all
         $pdf->SetFont('Helvetica', 'B', 16);
+        $pdf->SetTextColor(26, 26, 46);
+        $pdf->Cell(100, 8, utf8_decode(strtoupper($restaurant->name)), 0, 0);
+        
+        $pdf->SetFont('Helvetica', 'B', 14);
         $pdf->SetTextColor(50, 50, 100);
-        $pdf->Cell(80, 10, 'FACTURE', 0, 1, 'R');
+        $pdf->Cell(80, 8, 'FACTURE', 0, 1, 'R');
 
         $subtitle = data_get($restaurant->settings, 'receipt_subtitle');
         if ($subtitle) {
-            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->SetFont('Helvetica', 'B', 8);
             $pdf->SetTextColor(80, 80, 80);
-            $pdf->Cell(100, 5, utf8_decode(strtoupper($subtitle)), 0, 1);
+            $pdf->Cell(100, 4, utf8_decode(strtoupper($subtitle)), 0, 1);
         }
         $pdf->SetTextColor(0, 0, 0);
 
         // Restaurant Info
-        $pdf->SetFont('Helvetica', '', 9);
+        $pdf->SetFont('Helvetica', '', 8);
         $addr = $restaurant->address ? utf8_decode($restaurant->address) : '';
         $pdf->Cell(100, 4, $addr, 0, 0);
-        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->SetFont('Helvetica', 'B', 9);
         $pdf->Cell(80, 4, 'Ref : INV-' . $order->order_number, 0, 1, 'R');
         
-        $pdf->SetFont('Helvetica', '', 9);
+        $pdf->SetFont('Helvetica', '', 8);
         $phone = $restaurant->phone ? 'Tel : ' . $restaurant->phone : '';
         $pdf->Cell(100, 4, $phone, 0, 0);
         $pdf->Cell(80, 4, 'Date : ' . $order->created_at->format('d/m/Y H:i'), 0, 1, 'R');
@@ -489,16 +489,16 @@ class TicketPrintService
             $pdf->Cell(100, 4, 'TVA : ' . $restaurant->vat_number, 0, 1, 'L');
         }
 
-        $pdf->Ln(4);
+        $pdf->Ln(3);
 
         // Info Commande & Client
         $yBefore = $pdf->GetY();
         $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(90, 5, utf8_decode('DÉTAILS COMMANDE'), 'B', 0, 'L');
+        $pdf->Cell(95, 5, utf8_decode('DÉTAILS COMMANDE'), 'B', 0, 'L');
         $pdf->SetX(110);
         $pdf->Cell(85, 5, utf8_decode('INFORMATIONS CLIENT'), 'B', 1, 'L');
 
-        $pdf->SetFont('Helvetica', '', 9);
+        $pdf->SetFont('Helvetica', '', 8);
         $typeLabel = match($order->type) {
             'dine_in'  => 'Sur place',
             'takeaway' => 'À emporter',
@@ -506,86 +506,115 @@ class TicketPrintService
             default    => ucfirst($order->type),
         };
         
-        $pdf->Cell(45, 5, 'Type: ' . utf8_decode(strtoupper($typeLabel)), 0, 0);
+        $pdf->Cell(50, 4, 'Type: ' . utf8_decode(strtoupper($typeLabel)), 0, 0);
         if ($order->table) {
-            $pdf->Cell(45, 5, 'Table: ' . $order->table->number, 0, 0);
+            $pdf->Cell(45, 4, 'Table: ' . $order->table->number, 0, 0);
         }
+        $customer = $order->customer_name ?? 'Client de passage';
         $pdf->SetX(110);
-        $pdf->Cell(85, 5, utf8_decode($order->customer_name ?? 'Client de passage'), 0, 1);
+        $pdf->SetFont('Helvetica', 'B', 9);
+        $pdf->Cell(85, 4, utf8_decode($customer), 0, 1);
         
+        $pdf->SetFont('Helvetica', '', 8);
         if ($order->waiter) {
-            $pdf->Cell(90, 5, 'Serveur: ' . utf8_decode($order->waiter->first_name), 0, 1);
+            $pdf->Cell(95, 4, 'Serveur: ' . utf8_decode($order->waiter->first_name), 0, 1);
         } else {
-            $pdf->Ln(5);
+            $pdf->Ln(4);
         }
 
         // Table Header
         $pdf->SetFillColor(26, 26, 46);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(10, 7, '#', 0, 0, 'C', true);
-        $pdf->Cell(100, 7, 'Article / Description', 0, 0, 'L', true);
-        $pdf->Cell(15, 7, 'Qt', 0, 0, 'C', true);
-        $pdf->Cell(25, 7, 'P.U.', 0, 0, 'R', true);
-        $pdf->Cell(30, 7, 'Total', 0, 1, 'R', true);
+        $pdf->Cell(10, 6, '#', 0, 0, 'C', true);
+        $pdf->Cell(100, 6, 'Article / Description', 0, 0, 'L', true);
+        $pdf->Cell(15, 6, 'Qt', 0, 0, 'C', true);
+        $pdf->Cell(25, 6, 'P.U.', 0, 0, 'R', true);
+        $pdf->Cell(30, 6, 'Total', 0, 1, 'R', true);
 
         // Table Body
         $pdf->SetTextColor(0, 0, 0);
-        $pdf->SetFont('Helvetica', '', 9);
+        $pdf->SetFont('Helvetica', '', 8);
         $i = 1;
-        // Limiter le nombre d'items pour éviter le spill sur la version 2 par page
-        foreach ($items->take(12) as $item) {
+        // Limit items to ensure everything fits (around 8 items if payments are detailed)
+        foreach ($items->take(10) as $item) {
             $subtotal = $item->quantity * $item->unit_price;
-            $pdf->Cell(10, 6, $i++, 'B', 0, 'C');
-            $pdf->Cell(100, 6, utf8_decode(substr($item->product->name, 0, 45)), 'B', 0, 'L');
-            $pdf->Cell(15, 6, $item->quantity, 'B', 0, 'C');
-            $pdf->Cell(25, 6, number_format($item->unit_price, 0, '.', ' '), 'B', 0, 'R');
-            $pdf->Cell(30, 6, number_format($subtotal, 0, '.', ' '), 'B', 1, 'R');
+            $pdf->Cell(10, 5, $i++, 'B', 0, 'C');
+            $pdf->Cell(100, 5, utf8_decode(substr($item->product->name, 0, 50)), 'B', 0, 'L');
+            $pdf->Cell(15, 5, $item->quantity, 'B', 0, 'C');
+            $pdf->Cell(25, 5, number_format($item->unit_price, 0, '.', ' '), 'B', 0, 'R');
+            $pdf->Cell(30, 5, number_format($subtotal, 0, '.', ' '), 'B', 1, 'R');
+        }
+        if ($items->count() > 10) {
+            $pdf->Cell(180, 5, '... (Voir suite sur ticket original)', 0, 1, 'C');
         }
 
-        // Totals
+        // Totals & Payments
         $pdf->Ln(2);
+        $yTotals = $pdf->GetY();
+        
+        // Right side: Totals
         $pdf->SetX(110);
         $pdf->SetFont('Helvetica', '', 9);
         $pdf->Cell(40, 5, 'Sous-total', 0, 0, 'L');
         $pdf->Cell(30, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         
-        if ($order->discount_amount > 0) {
-            $pdf->SetX(110);
-            $pdf->Cell(40, 5, 'Remise', 0, 0, 'L');
-            $pdf->Cell(30, 5, '-' . number_format((float) $order->discount_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-        }
-
         $pdf->SetX(110);
         $pdf->Cell(40, 5, 'TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
         $pdf->Cell(30, 5, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
 
         $pdf->SetX(110);
-        $pdf->SetFont('Helvetica', 'B', 11);
-        $pdf->SetFillColor(26, 26, 46);
-        $pdf->SetTextColor(255, 255, 255);
-        $pdf->Cell(40, 7, 'TOTAL', 0, 0, 'L', true);
+        $pdf->SetFont('Helvetica', 'B', 10);
+        $pdf->SetFillColor(245, 245, 250);
+        $pdf->Cell(40, 7, utf8_decode('TOTAL À PAYER'), 0, 0, 'L', true);
         $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 0, 1, 'R', true);
-        $pdf->SetTextColor(0, 0, 0);
+
+        // Left side: Payment Details
+        $pdf->SetY($yTotals);
+        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->SetTextColor(100);
+        $pdf->Cell(95, 4, utf8_decode('DÉTAILS PAIEMENT'), 'B', 1, 'L');
+        $pdf->SetTextColor(0);
+        $pdf->SetFont('Helvetica', '', 8);
+        foreach ($order->payments as $pmt) {
+            $pdf->Cell(50, 4, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
+            $pdf->Cell(40, 4, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+            if ($pmt->amount_given) {
+                $pdf->SetTextColor(120);
+                $pdf->Cell(50, 4, utf8_decode('  Donné par le client'), 0, 0, 'L');
+                $pdf->Cell(40, 4, number_format($pmt->amount_given, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+                $pdf->SetTextColor(0);
+            }
+        }
+        
+        // Big Summary Box
+        $totalGiven = $order->payments->sum('amount_given');
+        $totalChange = $order->payments->sum('change_given');
+        if ($totalGiven > 0) {
+            $pdf->Ln(2);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->SetFillColor(240, 240, 240);
+            $pdf->Cell(60, 6, utf8_decode(' DONNÉ PAR LE CLIENT'), 1, 0, 'L', true);
+            $pdf->Cell(35, 6, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
+            $pdf->Cell(60, 6, ' MONNAIE RENDUE', 1, 0, 'L', true);
+            $pdf->Cell(35, 6, number_format($totalChange, 0, '.', ' ') . ' FCFA', 1, 1, 'R', true);
+        }
 
         // Footer
-        $pdf->Ln(4);
-        $pdf->SetFont('Helvetica', 'I', 8);
-        $pdf->SetDrawColor(200, 200, 200);
+        $pdf->SetY($yStart + 138); // Force footer near the middle/end of receipt block
+        $pdf->SetFont('Helvetica', 'I', 7);
+        $pdf->SetDrawColor(220);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
-        $pdf->Cell(0, 5, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance') . ' - Omega POS', 0, 1, 'C');
+        $pdf->Cell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance') . ' - Powered by Omega POS', 0, 1, 'C');
         
-        // Paid Stamp (Small)
+        // Paid Stamp (Diagonal-ish overlay)
         if ($order->paid_at) {
-            $pdf->SetFont('Helvetica', 'B', 20);
-            $pdf->SetTextColor(0, 150, 0); // FPDF basic doesn't support alpha easily
-            $pdf->Text(80, $pdf->GetY() - 15, 'PAYE');
+            $pdf->SetFont('Helvetica', 'B', 24);
+            $pdf->SetTextColor(0, 150, 0); 
+            $pdf->Text(75, $yTotals + 5, 'PAYE');
             $pdf->SetTextColor(0, 0, 0);
         }
-    }
-
-
-    /**
+    }    /**
      * Ticket Cuisine/Bar/Pizza en format PDF 58/80mm SANS PRIX
      */
     public function generateKitchenTicketPdf(Order $order, string $destination = 'kitchen'): string
