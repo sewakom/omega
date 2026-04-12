@@ -108,7 +108,7 @@ class TicketPrintService
   <div class='header'>
     <div class='destination'>{$icon} {$label}</div>
     <div class='order-num'>#{$order->order_number}</div>
-    <div class='meta'>LOCATION: {$locationLabel}{$restoPhone}</div>
+    <div class='meta'>IFU: 1001580865 | {$locationLabel}{$restoPhone}</div>
   </div>
   <div class='items'>
     {$itemsHtml}
@@ -129,7 +129,7 @@ class TicketPrintService
      */
     public function receiptHtml(Order $order): string
     {
-        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter', 'cashier']);
+        $order->loadMissing(['items.product', 'table', 'restaurant', 'payments', 'waiter']);
         $restaurant = $order->restaurant;
         $items = $order->items->whereNotIn('status', ['cancelled']);
 
@@ -225,7 +225,6 @@ class TicketPrintService
   <div class='divider'></div>
   <div class='line total-line'><span>TOTAL</span><span>{$total} FCFA</span></div>
   <div class='divider'></div>
-  {$paymentsHtml}
   {$givenChangeHtml}
   " . ($order->paid_at ? "<div class='paid-stamp'>PAYÉ</div>" : "") . "
   <div class='footer'>{$thanksMsg}<br>{$restaurant->name}</div>
@@ -618,7 +617,7 @@ class TicketPrintService
             $pdf->Cell(0, 4, utf8_decode($subtitle), 0, 1, 'C');
         }
         
-        $pdf->SetFont('Helvetica', 'B', 8);
+        $pdf->SetFont('Helvetica', 'B', 9);
         $pdf->Cell(0, 5, 'IFU : 1001580865', 0, 1, 'C');
         $pdf->Ln(2);
 
@@ -730,6 +729,8 @@ class TicketPrintService
         if ($restaurant->phone)   $pdf->Cell(0, 5, 'Te : ' . $restaurant->phone, 0, 1, 'C');
         if ($restaurant->vat_number) $pdf->Cell(0, 5, 'TVA : ' . $restaurant->vat_number, 0, 1, 'C');
         
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, 'IFU : 1001580865', 0, 1, 'C');
         $pdf->Cell(0, 5, '------------------------------------------', 0, 1, 'C');
         
         $pdf->SetFont('Arial', 'B', 10);
@@ -809,28 +810,7 @@ class TicketPrintService
 
         $pdf->Cell(0, 4, '------------------------------------------', 0, 1, 'C');
 
-        // PAIEMENTS
-        $pdf->SetFont('Arial', 'B', 8);
-        $pdf->Cell(0, 5, utf8_decode('Règlement :'), 0, 1);
-        $pdf->SetFont('Arial', '', 8);
-        
-        foreach ($order->payments as $pmt) {
-            $pdf->Cell(45, 4, utf8_decode(strtoupper($pmt->method)), 0, 0);
-            $pdf->Cell(25, 4, number_format($pmt->amount, 0, '.', ' '), 0, 1, 'R');
-            
-            if ($pmt->amount_given) {
-                $pdf->SetFont('Arial', '', 7);
-                $pdf->Cell(45, 3, utf8_decode('  Recu'), 0, 0);
-                $pdf->Cell(25, 3, number_format($pmt->amount_given, 0, '.', ' '), 0, 1, 'R');
-                $pdf->SetFont('Arial', '', 8);
-            }
-            if ($pmt->change_given) {
-                $pdf->SetFont('Arial', '', 7);
-                $pdf->Cell(45, 3, utf8_decode('  Rendu'), 0, 0);
-                $pdf->Cell(25, 3, number_format($pmt->change_given, 0, '.', ' '), 0, 1, 'R');
-                $pdf->SetFont('Arial', '', 8);
-            }
-        }
+        // PAIEMENTS - simplified to summary only
 
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');

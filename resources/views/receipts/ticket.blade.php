@@ -115,9 +115,6 @@
   @if($receipt['order']['waiter'])
   <tr><td class="muted">Serveur</td><td class="td-right">{{ $receipt['order']['waiter'] }}</td></tr>
   @endif
-  @if($receipt['order']['cashier'])
-  <tr><td class="muted">Caissier</td><td class="td-right">{{ $receipt['order']['cashier'] }}</td></tr>
-  @endif
 </table>
 
 <div class="divider"></div>
@@ -152,19 +149,7 @@
 
 <div class="divider"></div>
 
-{{-- PAIEMENTS --}}
-<div class="bold" style="margin-bottom:3px">Règlement :</div>
-<table>
-  @foreach($receipt['payments'] as $payment)
-  <tr><td>{{ $payment['method'] }} @if($payment['reference'])<span class="muted">({{ $payment['reference'] }})</span>@endif</td><td class="td-right">{{ $payment['amount_fmt'] }}</td></tr>
-  @if($payment['amount_given'])
-  <tr><td class="muted">  Reçu</td><td class="td-right muted">{{ number_format($payment['amount_given'], 0, '.', ' ') }} FCFA</td></tr>
-  @endif
-  @if($payment['change_given'])
-  <tr><td class="muted">  Rendu</td><td class="td-right muted">{{ $payment['change_fmt'] }}</td></tr>
-  @endif
-  @endforeach
-</table>
+{{-- PAIEMENTS simplified --}}
 
 @if($receipt['totals']['change'] > 0)
 <div class="divider-solid"></div>
