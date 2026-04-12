@@ -109,10 +109,10 @@ class CashSessionController extends Controller
             "Session fermée. Attendu: {$expected} | Compté: {$request->closing_amount} | Écart: {$diff}"
         );
 
-        // Envoi email rapport
+        // Envoi email rapport (Uniquement si les montants sont renseignés)
         $emailSent = false;
         $emailTo   = $request->send_report_to;
-        if ($emailTo) {
+        if ($emailTo && !is_null($session->amount_to_bank) && !is_null($session->remaining_amount)) {
             $emailSent = $this->reportService->sendReportByEmail($session, $emailTo);
         }
 
@@ -132,10 +132,18 @@ class CashSessionController extends Controller
 
         $request->validate(['email' => 'required|email']);
 
+        // Vérification des montants de clôture
+        if (is_null($session->amount_to_bank) || is_null($session->remaining_amount)) {
+            return response()->json([
+                'message' => 'Rapport bloqué : Les montants remis au banquier et le fond de caisse doivent être saisis avant l\'envoi.',
+                'sent' => false,
+            ], 422);
+        }
+
         $sent = $this->reportService->sendReportByEmail($session, $request->email);
 
         return response()->json([
-            'message'  => $sent ? 'Rapport envoyé avec succès.' : 'Échec de l\'envoi.',
+            'message'  => $sent ? 'Rapport envoyé avec succès.' : 'Échec de l\'envoi (vérifiez votre configuration SMTP).',
             'sent'     => $sent,
         ]);
     }

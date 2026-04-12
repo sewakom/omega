@@ -228,6 +228,12 @@ class DailyReportService
      */
     public function sendReportByEmail(CashSession $session, string $toEmail): bool
     {
+        // Sécurité : Ne pas envoyer si les montants de clôture sont absents
+        if (is_null($session->amount_to_bank) || is_null($session->remaining_amount)) {
+            Log::warning("Échec d'envoi du rapport : Montants manquants pour la session #{$session->id}");
+            return false;
+        }
+
         try {
             $html = $this->generateSessionReportHtml($session);
             $subject = "📊 RAPPORT DE CAISSE — {$session->restaurant->name} — " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
