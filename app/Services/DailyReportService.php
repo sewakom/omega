@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Expense;
 use App\Models\Payment;
+use App\Models\CustomerTab;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -49,6 +50,12 @@ class DailyReportService
         // 4. Dépenses
         $expenses = Expense::where('cash_session_id', $session->id)->get();
         $totalExpenses = $expenses->sum('amount');
+        
+        // 5. Nouveaux Crédits (Ardoises) - Commandes passées en ardoise durant cette session
+        $newCredits = Order::whereHas('customerTabs')
+            ->whereBetween('paid_at', [$session->opened_at, $session->closed_at ?? now()])
+            ->get();
+        $totalCredits = $newCredits->sum('total');
 
         // 5. Préparation des éléments HTML
         $paymentsHtml = '';
@@ -83,6 +90,22 @@ class DailyReportService
                     <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->description}</td>
                     <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$e->category}</td>
                     <td style='padding: 8px; border-bottom: 1px solid #eee; text-align:right; color: #e11d48;'>-{$amt} FCFA</td>
+                </tr>";
+            }
+        }
+
+        $creditsHtml = '';
+        if ($newCredits->isEmpty()) {
+            $creditsHtml = "<tr><td colspan='3' style='padding: 20px; text-align:center; color: #999; font-style: italic;'>Aucun crédit accordé</td></tr>";
+        } else {
+            foreach ($newCredits as $c) {
+                $tab = $c->customerTabs->first();
+                $client = $tab ? ($tab->first_name . ' ' . $tab->last_name) : 'Client Inconnu';
+                $amt = number_format((float)$c->total, 0, ',', ' ');
+                $creditsHtml .= "<tr>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee;'>#{$c->order_number}</td>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$client}</td>
+                    <td style='padding: 8px; border-bottom: 1px solid #eee; text-align:right; font-weight:bold;'>{$amt} FCFA</td>
                 </tr>";
             }
         }
@@ -133,7 +156,7 @@ class DailyReportService
 
         <div class='summary-grid'>
             <div class='stat-card primary'>
-                <div class='stat-label'>Ventes Totales</div>
+                <div class='stat-label'>Encaissé (Réel)</div>
                 <div class='stat-value'>" . number_format($totalRevenue, 0, ',', ' ') . " FCFA</div>
             </div>
             <div class='stat-card'>
@@ -141,8 +164,8 @@ class DailyReportService
                 <div class='stat-value' style='color: #e11d48;'>-" . number_format($totalExpenses, 0, ',', ' ') . " FCFA</div>
             </div>
             <div class='stat-card'>
-                <div class='stat-label'>Net de Session</div>
-                <div class='stat-value' style='color: #10b981;'>" . number_format($netEncaisse, 0, ',', ' ') . " FCFA</div>
+                <div class='stat-label'>Ventes à Crédit</div>
+                <div class='stat-value' style='color: #f97316;'>" . number_format($totalCredits, 0, ',', ' ') . " FCFA</div>
             </div>
         </div>
 
@@ -162,6 +185,12 @@ class DailyReportService
         <table>
             <thead><tr><th>Motif</th><th>Catégorie</th><th style='text-align:right;'>Montant</th></tr></thead>
             <tbody>{$expensesHtml}</tbody>
+        </table>
+
+        <div class='section-title'>Ventes à Crédit (Ardoises)</div>
+        <table>
+            <thead><tr><th>Commande</th><th>Client</th><th style='text-align:right;'>Montant</th></tr></thead>
+            <tbody>{$creditsHtml}</tbody>
         </table>
 
         <div class='section-title'>Rapprochement de Caisse</div>

@@ -9,6 +9,7 @@ use App\Models\Cancellation;
 use App\Models\CakeOrder;
 use App\Models\CashSession;
 use App\Models\Expense;
+use App\Models\CustomerTab;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -82,6 +83,16 @@ class DataExportService
             $cb(['Total Dépenses enregistrées', $totalExpenses]);
 
             $cb(['', '']);
+            $cb(['--- SYNTHESE ARDOISES (CREDITS) ---', '']);
+            $tabsStats = CustomerTab::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->selectRaw('SUM(total_amount) as total, SUM(paid_amount) as paid')
+                ->first();
+            $cb(['Total Montant Ardoises', $tabsStats->total ?? 0]);
+            $cb(['Total Montant Recouvré', $tabsStats->paid ?? 0]);
+            $cb(['Reste à recouvrer', ($tabsStats->total ?? 0) - ($tabsStats->paid ?? 0)]);
+
+            $cb(['', '']);
             $cb(['--- ANNULATIONS ---', '']);
             $cancelled = Order::where('restaurant_id', $restaurantId)
                 ->whereBetween('created_at', [$from, $to])
@@ -113,7 +124,7 @@ class DataExportService
         });
 
         // 3. Sheet Sessions Caisse
-        $this->addWorksheet($handle, 'Caisse', ['ID', 'Caissier', 'Ouverte le', 'Fermée le', 'Ouverture', 'Fermeture Attendue', 'Fermeture Réelle', 'Écart', 'Statut'], function($cb) use ($restaurantId, $from, $to) {
+        $this->addWorksheet($handle, 'Caisse', ['ID', 'Caissier', 'Ouverte le', 'Fermée le', 'Ouverture', 'Attendu', 'Reel (Total)', 'Versé Banquier', 'Fond Restant', 'Écart', 'Statut'], function($cb) use ($restaurantId, $from, $to) {
             CashSession::with('user')
                 ->where('restaurant_id', $restaurantId)
                 ->whereBetween('opened_at', [$from, $to])
@@ -124,9 +135,11 @@ class DataExportService
                             ($s->user->first_name ?? '') . ' ' . ($s->user->last_name ?? ''),
                             $s->opened_at->format('d/m/Y H:i'),
                             $s->closed_at ? $s->closed_at->format('d/m/Y H:i') : '-',
-                            $s->opening_balance,
-                            $s->expected_closing_balance,
-                            $s->actual_closing_balance,
+                            $s->opening_amount,
+                            $s->expected_amount,
+                            $s->closing_amount,
+                            $s->amount_to_bank ?? 0,
+                            $s->remaining_amount ?? 0,
                             $s->difference,
                             $s->status
                         ]);
@@ -202,7 +215,27 @@ class DataExportService
                 });
         });
 
-        // 8. Logs
+        // 8. Ardoises (Customer Tabs)
+        $this->addWorksheet($handle, 'Ardoises', ['Client', 'Telephone', 'Total Ardoise', 'Deja Paye', 'Reste a Payer', 'Statut', 'Ouvert le', 'Paye le'], function($cb) use ($restaurantId, $from, $to) {
+            CustomerTab::where('restaurant_id', $restaurantId)
+                ->whereBetween('created_at', [$from, $to])
+                ->chunk(100, function($tabs) use ($cb) {
+                    foreach ($tabs as $t) {
+                        $cb([
+                            $t->first_name . ' ' . $t->last_name,
+                            $t->phone,
+                            $t->total_amount,
+                            $t->paid_amount,
+                            $t->total_amount - $t->paid_amount,
+                            $t->status,
+                            $t->opened_at->format('d/m/Y H:i'),
+                            $t->paid_at ? $t->paid_at->format('d/m/Y H:i') : '-'
+                        ]);
+                    }
+                });
+        });
+
+        // 9. Logs
         $this->addWorksheet($handle, 'Logs Activité', ['ID', 'Date', 'Action', 'Sujet', 'Utilisateur'], function($cb) use ($from, $to) {
             DB::table('activity_logs')
                 ->whereBetween('created_at', [$from, $to])
