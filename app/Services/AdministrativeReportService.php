@@ -59,7 +59,7 @@ class AdministrativeReportService extends FPDF
         $orderStats = Order::where('restaurant_id', $restaurantId)
             ->whereDate('created_at', $today)
             ->where('status', '!=', 'cancelled')
-            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers')->first();
+            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(covers) as covers, SUM(vat_amount) as vat')->first();
             
         $restaurant_ca = (float)($orderStats->revenue ?? 0);
 
@@ -185,6 +185,15 @@ class AdministrativeReportService extends FPDF
 
         $this->Cell(120, 8, $this->s("   - Ventes Pâtisserie / Gâteaux:"), 0, 0);
         $this->Cell(70, 8, number_format($this->data['cake_revenue'], 0, ',', ' ') . " FCFA", 0, 1, 'R');
+
+        $totalVat = ($this->data['order_stats']->vat ?? 0);
+        if ($totalVat > 0) {
+            $this->SetFont('Arial', 'I', 10);
+            $this->SetTextColor(100, 100, 100);
+            $this->Cell(120, 6, $this->s("     (Dont TVA Incluse à reverser : " . number_format($totalVat, 0, ',', ' ') . " FCFA)"), 0, 1, 'L');
+            $this->SetTextColor(0);
+            $this->SetFont('Arial', '', 11);
+        }
         
         $this->Ln(4);
         
