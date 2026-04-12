@@ -448,23 +448,15 @@ class TicketPrintService
         // Paid Stamp en ARRIÈRE-PLAN (Style filigrane)
         if ($order->paid_at) {
             $stampCX = 105; // Centre horizontal
-            $stampCY = $yStart + 75; // Centre vertical approximatif du reçu
-            $stampW  = 70;
-            $stampH  = 22;
+            $stampCY = $yStart + 60; // Remonté (était à +75)
             $stampAngle = -30;
 
-            $pdf->SetDrawColor(210, 235, 210); // Encore plus clair pour l'arrière-plan
-            $pdf->SetLineWidth(1.2);
-            $pdf->RotatedRect($stampCX - $stampW/2, $stampCY - $stampH/2, $stampW, $stampH, $stampAngle);
-            $pdf->SetLineWidth(0.2);
+            $pdf->SetFont('Helvetica', 'B', 46); // Un peu plus grand sans le rectangle
+            $pdf->SetTextColor(215, 235, 215);
+            $pdf->RotatedText($stampCX - 25, $stampCY + 5, utf8_decode('PAYÉ'), $stampAngle);
 
-            $pdf->SetFont('Helvetica', 'B', 36);
-            $pdf->SetTextColor(210, 235, 210);
-            $pdf->RotatedText($stampCX - 22, $stampCY + 5, utf8_decode('PAYÉ'), $stampAngle);
-
-            // Restaurer couleurs pour le texte qui arrive par dessus
+            // Restaurer couleurs
             $pdf->SetTextColor(0, 0, 0);
-            $pdf->SetDrawColor(0, 0, 0);
         }
 
         // Header - Reduced size to fit all
