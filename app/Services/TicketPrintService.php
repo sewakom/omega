@@ -177,7 +177,6 @@ class TicketPrintService
         $total       = number_format((float) ($order->total ?? 0), 0, ',', ' ');
         $date        = now()->format('d/m/Y H:i');
         $serveur     = $order->waiter ? ($order->waiter->first_name . ' ' . $order->waiter->last_name) : null;
-        $cashierName = $order->cashier ? $order->cashier->first_name : 'Caisse';
         $restoAddress = $restaurant->address ?? '';
 
         $logoHtml = ($restaurant->logo && file_exists(storage_path('app/public/' . $restaurant->logo)))
@@ -186,7 +185,6 @@ class TicketPrintService
 
 
         $thanksMsg   = $restaurant->settings['thank_you_message'] ?? 'Merci de votre visite !';
-        $restoPhoneHtml = $restaurant->phone ? "<div>Tél: {$restaurant->phone}</div>" : '';
 
         return "<!DOCTYPE html>
 <html>
@@ -209,17 +207,16 @@ class TicketPrintService
 <body>
   {$logoHtml}
   <div class='header'>
-    <div class='resto-name'>{$restaurant->name}</div>
+    <div class='resto-name'>" . strtoupper($restaurant->name) . "</div>
     " . (data_get($restaurant->settings, 'receipt_subtitle') ? "<div style='font-size:10px; font-weight:bold; margin-bottom:2px; color:#555;'>" . data_get($restaurant->settings, 'receipt_subtitle') . "</div>" : "") . "
     " . ($restoAddress ? "<div style='font-size:9px'>{$restoAddress}</div>" : "") . "
-    " . ($restaurant->phone ? "<div style='font-size:9px'>Tél: {$restaurant->phone}</div>" : "") . "
     <div style='font-size:10px; font-weight:bold; margin-top:2px;'>IFU : 1001580865</div>
+    " . ($restaurant->phone ? "<div style='font-size:9px'>Tél: {$restaurant->phone}</div>" : "") . "
     <div style='font-size:9px'>{$date}</div>
   </div>
   <div class='table-box'>{$tableLabel}</div>
   <div class='line'><span>Ticket</span><span>#{$order->order_number}</span></div>
   " . ($serveur ? "<div class='line'><span>Serveur</span><span>{$serveur}</span></div>" : "") . "
-  <div class='line'><span>Caissier</span><span>{$cashierName}</span></div>
   <div class='divider'></div>
   {$itemsHtml}
   <div class='divider'></div>
