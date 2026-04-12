@@ -241,15 +241,34 @@ class DailyReportService
      */
     public function sendReportByEmail(CashSession $session, string $toEmail): bool
     {
-        try {
-            $html = $this->generateSessionReportHtml($session);
-            $subject = "RAPPORT DE CAISSE - " . strtoupper($session->restaurant->name) . " - " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y'));
+        Log::info("Tentative d'envoi du rapport de caisse à : " . $toEmail);
 
-            Mail::send([], [], function ($message) use ($toEmail, $subject, $html) {
+        try {
+            $totalRevenue = Payment::where('cash_session_id', $session->id)->sum('amount');
+            $totalExpenses = Expense::where('cash_session_id', $session->id)->sum('amount');
+            
+            $text = "RAPPORT DE CAISSE - SESSION #{$session->id}\n";
+            $text .= "----------------------------------------\n";
+            $text .= "Restaurant : " . strtoupper($session->restaurant->name) . "\n";
+            $text .= "Date : " . ($session->opened_at?->format('d/m/Y') ?? date('d/m/Y')) . "\n";
+            $text .= "Caissier : " . $session->user->first_name . "\n\n";
+            $text .= "SYNTHÈSE FINANCIÈRE :\n";
+            $text .= "- Recette Totale : " . number_format($totalRevenue, 0, ',', ' ') . " FCFA\n";
+            $text .= "- Dépenses : " . number_format($totalExpenses, 0, ',', ' ') . " FCFA\n";
+            $text .= "- Crédits (Ardoises) : " . number_format(0, 0, ',', ' ') . " FCFA\n\n";
+            $text .= "RÉCONCILIATION :\n";
+            $text .= "- Attendu en caisse : " . number_format((float)$session->expected_amount, 0, ',', ' ') . " FCFA\n";
+            $text .= "- Remis au banquier : " . ($session->amount_to_bank ? number_format((float)$session->amount_to_bank, 0, ',', ' ') : '0') . " FCFA\n";
+            $text .= "- Fond de caisse restant : " . ($session->remaining_amount ? number_format((float)$session->remaining_amount, 0, ',', ' ') : '0') . " FCFA\n";
+            $text .= "----------------------------------------\n";
+            $text .= "Ceci est une version texte simplifiée pour valider l'envoi SMTP.";
+
+            $subject = "RAPPORT CAISSE (TEXTE) - " . strtoupper($session->restaurant->name);
+
+            Mail::raw($text, function ($message) use ($toEmail, $subject) {
                 $message->to($toEmail)
                     ->subject($subject)
-                    ->from(config('mail.from.address'), config('mail.from.name'))
-                    ->html($html);
+                    ->from(config('mail.from.address'), config('mail.from.name'));
             });
 
             $session->update([
@@ -257,11 +276,13 @@ class DailyReportService
                 'report_email'   => $toEmail,
             ]);
 
+            Log::info("Rapport envoyé avec succès à : " . $toEmail);
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to send cash session report: ' . $e->getMessage());
+            Log::error('Erreur SMTP lors de l\'envoi du rapport : ' . $e->getMessage());
             return false;
         }
     }
+
 
 }
