@@ -97,6 +97,7 @@
   @if($receipt['restaurant']['vat_number'])
     <div class="muted">TVA : {{ $receipt['restaurant']['vat_number'] }}</div>
   @endif
+  <div class="bold" style="margin-top:2px;">IFU : 1001580865</div>
 </div>
 
 <div class="divider"></div>

@@ -884,8 +884,10 @@ class TicketPrintService
         
         $pdf->Cell(120, 5, utf8_decode('Tél: ' . $restaurant->phone), 0, 0);
         $pdf->Cell(0, 5, utf8_decode('Réf: ARD-' . $tab->id), 0, 1, 'R');
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->Cell(0, 5, 'IFU : 1001580865', 0, 1, 'R');
         
-        $pdf->Ln(10);
+        $pdf->Ln(5);
         
         // Bloc Client
         $pdf->SetFillColor(245, 245, 245);

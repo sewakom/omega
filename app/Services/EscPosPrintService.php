@@ -63,6 +63,7 @@ class EscPosPrintService
             $printer->setTextSize(1, 1);
             $printer->text("Ticket #" . $order->order_number . "\n");
             $printer->text("Modifie le: " . now()->format('d/m/Y H:i') . "\n");
+            $printer->text("IFU : 1001580865\n");
             $printer->text(str_repeat('-', 42) . "\n");
 
             // Info de la commande
