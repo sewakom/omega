@@ -545,6 +545,7 @@ class TicketPrintService
         $pdf->SetFont('Helvetica', 'B', 10);
         $pdf->Cell(40, 7, utf8_decode('TOTAL À PAYER'), 'T,B', 0, 'L');
         $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
+        $yRight = $pdf->GetY();
 
         // Left side: Payment Details
         $pdf->SetY($yTotals);
@@ -554,15 +555,18 @@ class TicketPrintService
         $pdf->SetTextColor(0);
         $pdf->SetFont('Helvetica', '', 8);
         foreach ($order->payments as $pmt) {
-            $pdf->Cell(50, 4, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
-            $pdf->Cell(40, 4, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+            $pdf->Cell(50, 5, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
+            $pdf->Cell(40, 5, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         }
+        $yLeft = $pdf->GetY();
         
+        // SET CURSOR BELOW BOTH BLOCKS TO AVOID OVERLAP
+        $pdf->SetY(max($yLeft, $yRight) + 4);
+
         // Big Summary Box
         $totalGiven = $order->payments->sum('amount_given');
         $totalChange = $order->payments->sum('change_given');
         if ($totalGiven > 0) {
-            $pdf->Ln(2);
             $pdf->SetFont('Helvetica', 'B', 9);
             $pdf->Cell(60, 6, utf8_decode(' DONNÉ PAR LE CLIENT'), 'B', 0, 'L');
             $pdf->Cell(35, 6, number_format($totalGiven, 0, '.', ' ') . ' FCFA', 'B', 1, 'R');
@@ -576,13 +580,13 @@ class TicketPrintService
         $pdf->SetDrawColor(220);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Cell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance') . ' - Powered by Omega POS', 0, 1, 'C');
-        
-        // Paid Stamp (Diagonal-ish overlay)
+
+        // Paid Stamp (Filigrane clair, grand, au milieu)
         if ($order->paid_at) {
-            $pdf->SetFont('Helvetica', 'B', 24);
-            $pdf->SetTextColor(0, 150, 0); 
-            $pdf->Text(75, $yTotals + 5, 'PAYE');
-            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetFont('Helvetica', 'B', 50);
+            $pdf->SetTextColor(230, 245, 230); // Very light green (flou / watermark effect)
+            $pdf->Text(65, $yStart + 70, 'P  A  Y  E'); // Place at center of the receipt vertically/horizontally
+            $pdf->SetTextColor(0, 0, 0); // Restore black color
         }
     }    /**
      * Ticket Cuisine/Bar/Pizza en format PDF 58/80mm SANS PRIX
@@ -953,7 +957,7 @@ class TicketPrintService
         
         $pdf->SetX(120);
         $pdf->Cell(45, 8, utf8_decode('TVA (' . $vatRate . '%)'), 0, 0);
-        $pdf->Cell(35, 8, number_format($totalVat, 0, '.', ' '), 0, 1, 'R');
+        $pdf->Cell(35, 8, number_format((float) $totalVat, 0, '.', ' '), 0, 1, 'R');
         
         $pdf->SetX(120);
         $pdf->SetTextColor(0);
