@@ -194,6 +194,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('by-waiter',        [Api\ReportController::class, 'byWaiter']);
         Route::get('by-category',      [Api\ReportController::class, 'byCategory']);
         Route::get('cash-summary',     [Api\ReportController::class, 'cashSummary']);
+        Route::get('tax-summary',      [Api\ReportController::class, 'taxSummary']);
         Route::get('export-all',       [Api\ExportController::class, 'export']);
         Route::post('purge-data',      [Api\ExportController::class, 'purge']);
     });

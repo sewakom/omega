@@ -309,4 +309,30 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename=\"Rapport_Administratif_{$date}.pdf\"");
     }
+
+    public function taxSummary(Request $request)
+    {
+        $request->validate([
+            'from' => 'required|date',
+            'to' => 'required|date|after_or_equal:from'
+        ]);
+        
+        $restaurantId = $request->user()->restaurant_id;
+        
+        $totals = Order::where('restaurant_id', $restaurantId)
+            ->where('status', 'paid')
+            ->whereBetween('paid_at', [$request->from, $request->to . ' 23:59:59'])
+            ->selectRaw('COUNT(*) as count, SUM(total) as revenue, SUM(vat_amount) as vat')
+            ->first();
+
+        // On peut aussi inclure les gâteaux si nécessaire, mais souvent la TVA dépend de la facturation standard
+        
+        return response()->json([
+            'from' => $request->from,
+            'to' => $request->to,
+            'orders_count' => (int) ($totals->count ?? 0),
+            'total_revenue' => (float) ($totals->revenue ?? 0),
+            'total_vat' => (float) ($totals->vat ?? 0),
+        ]);
+    }
 }
