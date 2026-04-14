@@ -295,8 +295,7 @@ class TicketPrintService
         $restoPhone  = $restaurant->phone ?? '';
 
         $discountRow = $discount
-            ? "<tr><td>Remise</td><td style='text-align:right'>- {$discount}</td></tr>"
-                . ($order->discount_reason ? "<tr><td colspan='2' style='text-align:right; font-size:10px; color:#666; padding-top:2px;'>{$order->discount_reason}</td></tr>" : '')
+            ? "<tr><td>Remise</td><td colspan='3'>{$order->discount_reason}</td><td style='text-align:right'>- {$discount}</td></tr>"
             : '';
 
         $customerBlock = '';
@@ -369,22 +368,18 @@ class TicketPrintService
       {$itemsHtml}
     </tbody>
   </table>
-  <div style='display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-top:20px;'>
-    <div style='flex:1; min-width:220px;'>
-      <div style='font-size:12px; font-weight:700; margin-bottom:8px; letter-spacing:0.08em;'>DÉTAILS PAIEMENT</div>
-      <table style='width:100%;'>
-        {$paymentsHtml}
-      </table>
-      {$givenSummaryHtml}
-    </div>
-    <div style='flex:0 0 38%; min-width:180px;'>
-      <table class='totals-table' style='width:100%;'>
-        <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
-        {$discountRow}
-        <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
-        <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
-      </table>
-    </div>
+  <table class='totals-table' style='width:45%; margin-left:55%; margin-top:20px;'>
+    <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
+    {$discountRow}
+    <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
+    <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
+  </table>
+  <div style='margin-top:10px;'>
+    <h3 style='border-bottom:1px solid #eee; padding-bottom:3px; font-size:11px; margin-bottom:6px;'>DÉTAILS PAIEMENT</h3>
+    <table style='width:50%;'>
+      {$paymentsHtml}
+    </table>
+    {$givenSummaryHtml}
   </div>
   <div class='footer'>
     {$thanksMsg} — {$restaurant->name} — Document certifié
@@ -561,13 +556,6 @@ class TicketPrintService
         $pdf->SetFont('Helvetica', '', 9);
         $pdf->Cell(40, 5, 'Sous-total', 0, 0, 'L');
         $pdf->Cell(30, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-
-        if ($order->discount_amount > 0) {
-            $pdf->SetX(110);
-            $pdf->SetFont('Helvetica', '', 8);
-            $pdf->Cell(40, 5, 'Remise', 0, 0, 'L');
-            $pdf->Cell(30, 5, '- ' . number_format((float) $order->discount_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-        }
         
         $pdf->SetX(110);
         $pdf->SetFont('Helvetica', 'B', 10);
