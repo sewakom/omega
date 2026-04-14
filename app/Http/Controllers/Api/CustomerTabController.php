@@ -230,4 +230,22 @@ class CustomerTabController extends Controller
 
         return response()->json(['message' => 'Ardoise annulée.']);
     }
+
+    /**
+     * Impression directe sur imprimante réseau pour l'ardoise (relevé)
+     */
+    public function printNetwork(\Illuminate\Http\Request $request, \App\Models\CustomerTab $tab, \App\Services\EscPosPrintService $printService)
+    {
+        abort_if($tab->restaurant_id !== $request->user()->restaurant_id, 403);
+
+        $result = $printService->printCustomerTab($tab);
+        
+        if ($result['success']) {
+            return response()->json(['message' => 'Impression lancée avec succès.']);
+        }
+        
+        return response()->json([
+            'message' => 'L\'impression a échoué : ' . ($result['message'] ?? 'Erreur inconnue'),
+        ], 500);
+    }
 }

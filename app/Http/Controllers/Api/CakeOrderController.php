@@ -410,4 +410,22 @@ class CakeOrderController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
         return $pdf->download("Confirmation_Gateau_{$cakeOrder->order_number}.pdf");
     }
+
+    /**
+     * Impression directe sur imprimante réseau pour les gâteaux
+     */
+    public function printNetwork(\Illuminate\Http\Request $request, \App\Models\CakeOrder $cakeOrder, \App\Services\EscPosPrintService $printService)
+    {
+        abort_if($cakeOrder->restaurant_id !== $request->user()->restaurant_id, 403);
+
+        $result = $printService->printCakeOrder($cakeOrder);
+        
+        if ($result['success']) {
+            return response()->json(['message' => 'Impression lancée avec succès.']);
+        }
+        
+        return response()->json([
+            'message' => 'L\'impression a échoué : ' . ($result['message'] ?? 'Erreur inconnue'),
+        ], 500);
+    }
 }

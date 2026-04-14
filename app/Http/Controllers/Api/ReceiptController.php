@@ -193,6 +193,18 @@ class ReceiptController extends Controller
         return response()->json(['message' => $result['message']], 500);
     }
 
+    public function bulkPrintNetwork(Request $request, \App\Services\EscPosPrintService $escPos)
+    {
+        $request->validate(['order_ids' => 'required|array']);
+        $result = $escPos->bulkPrintCustomerReceipts($request->order_ids);
+
+        if ($result['success']) {
+            return response()->json(['message' => 'Impressions lancées avec succès.']);
+        }
+
+        return response()->json(['message' => $result['message']], 500);
+    }
+
     /** Helper pour renvoyer le PDF A4 direct */
     private function invoiceA4PdfDirect(Order $order)
     {

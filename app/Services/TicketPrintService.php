@@ -205,7 +205,7 @@ class TicketPrintService
   .total-line { font-weight: bold; font-size: 14px; }
   .footer { text-align: center; margin-top: 10px; font-size: 10px; font-weight: bold; border-top: 1px dashed #000; padding-top: 4px; }
   .table-box { border: 2px solid #000; font-weight: 900; text-align: center; padding: 4px; margin: 4px 0; font-size: 14px; }
-  .paid-stamp { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 28px; font-weight: 900; color: rgba(0,128,0,0.3); border: 4px solid rgba(0,128,0,0.3); padding: 6px 16px; letter-spacing: 4px; border-radius: 8px; pointer-events: none; z-index: 999; }
+  .paid-stamp { position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 42px; font-weight: 900; color: rgba(0,128,0,0.15); padding: 6px 16px; letter-spacing: 4px; pointer-events: none; z-index: -1; }
   @media print { @page { margin: 0; } }
 </style>
 </head>
@@ -295,7 +295,8 @@ class TicketPrintService
         $restoPhone  = $restaurant->phone ?? '';
 
         $discountRow = $discount
-            ? "<tr><td>Remise</td><td colspan='3'>{$order->discount_reason}</td><td style='text-align:right'>- {$discount}</td></tr>"
+            ? "<tr><td>Remise</td><td style='text-align:right'>- {$discount}</td></tr>"
+                . ($order->discount_reason ? "<tr><td colspan='2' style='text-align:right; font-size:10px; color:#666; padding-top:2px;'>{$order->discount_reason}</td></tr>" : '')
             : '';
 
         $customerBlock = '';
@@ -327,7 +328,7 @@ class TicketPrintService
   .total-row td { font-weight: bold; font-size: 14px; border-top: 2px solid #000; padding-top: 6px; }
   .footer { margin-top: 15px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 8px; }
   .table-badge { background: #eee; color: #111; padding: 3px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #ccc; }
-  .paid-watermark { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 72px; font-weight: 900; color: rgba(0,128,0,0.15); border: 8px solid rgba(0,128,0,0.15); padding: 15px 50px; letter-spacing: 10px; border-radius: 15px; pointer-events: none; z-index: 10; }
+  .paid-watermark { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg); font-size: 96px; font-weight: 900; color: rgba(0,128,0,0.1); padding: 15px 50px; letter-spacing: 12px; pointer-events: none; z-index: -1; }
   .serveur-badge { background: transparent; border: 1px dashed #ccc; padding: 4px 10px; border-radius: 4px; font-size: 11px; display: inline-block; margin-bottom: 8px; }
   @media print { @page { size: A4; margin: 10mm; } }
 </style>
@@ -368,18 +369,22 @@ class TicketPrintService
       {$itemsHtml}
     </tbody>
   </table>
-  <table class='totals-table' style='width:45%; margin-left:55%; margin-top:20px;'>
-    <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
-    {$discountRow}
-    <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
-    <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
-  </table>
-  <div style='margin-top:10px;'>
-    <h3 style='border-bottom:1px solid #eee; padding-bottom:3px; font-size:11px; margin-bottom:6px;'>DÉTAILS PAIEMENT</h3>
-    <table style='width:50%;'>
-      {$paymentsHtml}
-    </table>
-    {$givenSummaryHtml}
+  <div style='display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-top:20px;'>
+    <div style='flex:1; min-width:220px;'>
+      <div style='font-size:12px; font-weight:700; margin-bottom:8px; letter-spacing:0.08em;'>DÉTAILS PAIEMENT</div>
+      <table style='width:100%;'>
+        {$paymentsHtml}
+      </table>
+      {$givenSummaryHtml}
+    </div>
+    <div style='flex:0 0 38%; min-width:180px;'>
+      <table class='totals-table' style='width:100%;'>
+        <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
+        {$discountRow}
+        <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
+        <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
+      </table>
+    </div>
   </div>
   <div class='footer'>
     {$thanksMsg} — {$restaurant->name} — Document certifié
@@ -556,6 +561,13 @@ class TicketPrintService
         $pdf->SetFont('Helvetica', '', 9);
         $pdf->Cell(40, 5, 'Sous-total', 0, 0, 'L');
         $pdf->Cell(30, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+
+        if ($order->discount_amount > 0) {
+            $pdf->SetX(110);
+            $pdf->SetFont('Helvetica', '', 8);
+            $pdf->Cell(40, 5, 'Remise', 0, 0, 'L');
+            $pdf->Cell(30, 5, '- ' . number_format((float) $order->discount_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        }
         
         $pdf->SetX(110);
         $pdf->SetFont('Helvetica', 'B', 10);

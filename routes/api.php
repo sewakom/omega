@@ -130,6 +130,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{tab}/attach',              [Api\CustomerTabController::class, 'attachOrder']);
         Route::post('/{tab}/pay',                 [Api\CustomerTabController::class, 'pay']);
         Route::post('/{tab}/cancel',              [Api\CustomerTabController::class, 'cancel']);
+        Route::post('/{tab}/print-network',       [Api\CustomerTabController::class, 'printNetwork']);
     });
 
     // ------------------------------------------------
@@ -144,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{cakeOrder}/collect',           [Api\CakeOrderController::class, 'collect']);
         Route::get('/{cakeOrder}/ticket',             [Api\CakeOrderController::class, 'ticket']);
         Route::get('/{cakeOrder}/pdf',                [Api\CakeOrderController::class, 'receiptPdf']);
+        Route::post('/{cakeOrder}/print-network',     [Api\CakeOrderController::class, 'printNetwork']);
     });
 
     // Catégories
@@ -205,6 +207,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{orderId}/html',        [Api\ReceiptController::class, 'html']);
         Route::get('{orderId}/a4',          [Api\ReceiptController::class, 'invoiceA4']);
         Route::post('bulk-a4',              [Api\ReceiptController::class, 'bulkA4']);
+        Route::post('bulk-network',         [Api\ReceiptController::class, 'bulkPrintNetwork']);
         Route::post('{orderId}/print-network', [Api\ReceiptController::class, 'printNetwork']);
         Route::post('{orderId}/send-email', [Api\ReceiptController::class, 'sendEmail']);
     });
