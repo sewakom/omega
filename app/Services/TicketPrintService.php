@@ -235,7 +235,10 @@ class TicketPrintService
   " . ($order->paid_at ? "<div class='paid-stamp'>PAYÉ</div>" : "") . "
   <div class='footer'>
     {$thanksMsg}<br>{$restaurant->name}
-    <div style='margin-top:8px;'><img src='/img/website_qr.png' style='width:25mm; height:25mm; display:block; margin:0 auto;'></div>
+    <div style='margin-top:8px;'>
+      <div style='font-size:8px; font-weight:bold; margin-bottom:2px;'>Hello, Scan moi</div>
+      <img src='/img/website_qr.png' style='width:22mm; height:22mm; display:block; margin:0 auto;'>
+    </div>
   </div>
 </body>
 </html>";
@@ -386,7 +389,6 @@ class TicketPrintService
   </div>
   <div class='footer'>
     {$thanksMsg} — {$restaurant->name} — Document certifié
-    <div style='margin-top:10px;'><img src='/img/website_qr.png' style='width:30mm; height:30mm; display:block; margin:0 auto;'></div>
   </div>
 </body>
 </html>";
@@ -605,14 +607,6 @@ class TicketPrintService
         $pdf->SetDrawColor(220);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
         $pdf->Cell(0, 4, utf8_decode($thanksMsg) . ' - Powered by Omega POS', 0, 1, 'C');
-
-        // QR Code - Site Web
-        try {
-            $qrPath = public_path('img/website_qr.png');
-            if (file_exists($qrPath)) {
-                $pdf->Image($qrPath, 90, $pdf->GetY() + 1, 25);
-            }
-        } catch (\Exception $e) {}
 
     }
     /**
@@ -873,9 +867,11 @@ class TicketPrintService
         try {
             $qrPath = public_path('img/website_qr.png');
             if (file_exists($qrPath)) {
-                $pdf->Ln(2);
-                $pdf->Image($qrPath, 25, $pdf->GetY(), 30);
-                $pdf->Ln(32);
+                $pdf->Ln(1);
+                $pdf->SetFont('Arial', 'B', 7);
+                $pdf->Cell(0, 4, 'Hello, Scan moi', 0, 1, 'C');
+                $pdf->Image($qrPath, 28, $pdf->GetY(), 24);
+                $pdf->Ln(28);
             }
         } catch (\Exception $e) {}
 
