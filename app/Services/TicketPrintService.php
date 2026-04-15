@@ -233,7 +233,10 @@ class TicketPrintService
   <div class='divider'></div>
   {$givenChangeHtml}
   " . ($order->paid_at ? "<div class='paid-stamp'>PAYÉ</div>" : "") . "
-  <div class='footer'>{$thanksMsg}<br>{$restaurant->name}</div>
+  <div class='footer'>
+    {$thanksMsg}<br>{$restaurant->name}
+    <div style='margin-top:8px;'><img src='/img/website_qr.png' style='width:25mm; height:25mm; display:block; margin:0 auto;'></div>
+  </div>
 </body>
 </html>";
     }
@@ -383,6 +386,7 @@ class TicketPrintService
   </div>
   <div class='footer'>
     {$thanksMsg} — {$restaurant->name} — Document certifié
+    <div style='margin-top:10px;'><img src='/img/website_qr.png' style='width:30mm; height:30mm; display:block; margin:0 auto;'></div>
   </div>
 </body>
 </html>";
@@ -595,11 +599,20 @@ class TicketPrintService
         }
 
         // Footer
+        $thanksMsg = data_get($restaurant->settings, 'thank_you_message') ?? 'Merci pour votre confiance';
         $pdf->SetY($yStart + 138); // Force footer near the middle/end of receipt block
         $pdf->SetFont('Helvetica', 'I', 7);
         $pdf->SetDrawColor(220);
         $pdf->Line(15, $pdf->GetY(), 195, $pdf->GetY());
-        $pdf->Cell(0, 4, utf8_decode($restaurant->settings['thank_you_message'] ?? 'Merci pour votre confiance') . ' - Powered by Omega POS', 0, 1, 'C');
+        $pdf->Cell(0, 4, utf8_decode($thanksMsg) . ' - Powered by Omega POS', 0, 1, 'C');
+
+        // QR Code - Site Web
+        try {
+            $qrPath = public_path('img/website_qr.png');
+            if (file_exists($qrPath)) {
+                $pdf->Image($qrPath, 90, $pdf->GetY() + 1, 25);
+            }
+        } catch (\Exception $e) {}
 
     }
     /**
@@ -855,6 +868,16 @@ class TicketPrintService
         $pdf->SetFont('Arial', '', 7);
         $pdf->Cell(0, 4, utf8_decode('Généré le ' . now()->format('d/m/Y à H:i')), 0, 1, 'C');
         $pdf->Cell(0, 4, utf8_decode('Certifié par smartflow POS'), 0, 1, 'C');
+
+        // QR Code - Site Web
+        try {
+            $qrPath = public_path('img/website_qr.png');
+            if (file_exists($qrPath)) {
+                $pdf->Ln(2);
+                $pdf->Image($qrPath, 25, $pdf->GetY(), 30);
+                $pdf->Ln(32);
+            }
+        } catch (\Exception $e) {}
 
         return $pdf->Output('S');
     }
