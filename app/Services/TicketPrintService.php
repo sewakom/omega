@@ -368,13 +368,13 @@ class TicketPrintService
       {$itemsHtml}
     </tbody>
   </table>
-  <table class='totals-table' style='width:45%; margin-left:55%; margin-top:20px;'>
+  <table class='totals-table' style='width:45%; margin-top:20px;'>
     <tr><td>Sous-total</td><td style='text-align:right'>{$subtotal} FCFA</td></tr>
     {$discountRow}
     <tr class='total-row'><td>TOTAL TTC</td><td style='text-align:right'>{$total} FCFA</td></tr>
     <tr><td><small>Dont TVA ({$vatRate}%)</small></td><td style='text-align:right'><small>{$vat} FCFA</small></td></tr>
   </table>
-  <div style='margin-top:10px;'>
+  <div style='margin-top:15px;'>
     <h3 style='border-bottom:1px solid #eee; padding-bottom:3px; font-size:11px; margin-bottom:6px;'>DÉTAILS PAIEMENT</h3>
     <table style='width:50%;'>
       {$paymentsHtml}
@@ -549,27 +549,28 @@ class TicketPrintService
 
         // Totals & Payments
         $pdf->Ln(2);
-        $yTotals = $pdf->GetY();
         
-        // Right side: Totals
-        $pdf->SetX(110);
+        // Block 1: Totals (Now on the left, above payments)
         $pdf->SetFont('Helvetica', '', 9);
-        $pdf->Cell(40, 5, 'Sous-total', 0, 0, 'L');
-        $pdf->Cell(30, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        $pdf->Cell(45, 5, 'Sous-total', 0, 0, 'L');
+        $pdf->Cell(35, 5, number_format((float) $order->subtotal, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         
-        $pdf->SetX(110);
+        if (($order->discount_amount ?? 0) > 0) {
+            $pdf->Cell(45, 5, 'Remise', 0, 0, 'L');
+            $pdf->Cell(35, 5, '-' . number_format((float) $order->discount_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        }
+
         $pdf->SetFont('Helvetica', 'B', 10);
-        $pdf->Cell(40, 7, utf8_decode('TOTAL TTC'), 'T,B', 0, 'L');
-        $pdf->Cell(30, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
+        $pdf->Cell(45, 7, utf8_decode('TOTAL TTC'), 'T,B', 0, 'L');
+        $pdf->Cell(35, 7, number_format((float) $order->total, 0, '.', ' ') . ' FCFA', 'T,B', 1, 'R');
 
-        $pdf->SetX(110);
         $pdf->SetFont('Helvetica', '', 8);
-        $pdf->Cell(40, 5, 'Dont TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
-        $pdf->Cell(30, 5, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
-        $yRight = $pdf->GetY();
+        $pdf->Cell(45, 5, 'Dont TVA (' . ($restaurant->settings['default_vat_rate'] ?? 18) . '%)', 0, 0, 'L');
+        $pdf->Cell(35, 5, number_format((float) $order->vat_amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
+        
+        $pdf->Ln(4);
 
-        // Left side: Payment Details
-        $pdf->SetY($yTotals);
+        // Block 2: Payment Details (Below totals)
         $pdf->SetFont('Helvetica', 'B', 8);
         $pdf->SetTextColor(100);
         $pdf->Cell(95, 4, utf8_decode('DÉTAILS PAIEMENT'), 'B', 1, 'L');
@@ -579,10 +580,8 @@ class TicketPrintService
             $pdf->Cell(50, 5, utf8_decode(strtoupper($pmt->method)), 0, 0, 'L');
             $pdf->Cell(40, 5, number_format($pmt->amount, 0, '.', ' ') . ' FCFA', 0, 1, 'R');
         }
-        $yLeft = $pdf->GetY();
         
-        // SET CURSOR BELOW BOTH BLOCKS TO AVOID OVERLAP
-        $pdf->SetY(max($yLeft, $yRight) + 4);
+        $pdf->Ln(2);
 
         // Big Summary Box
         $totalGiven = $order->payments->sum('amount_given');
